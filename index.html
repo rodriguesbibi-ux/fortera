@@ -250,6 +250,51 @@ textarea.in{min-height:90px;padding:10px 14px;resize:vertical}
 <body>
 <div id="app"></div>
 <div id="toast-host"></div>
+<script type="module">
+(async () => {
+  const firebaseConfig = {
+    apiKey: "AIzaSyBGWP4uu46MeKuWw28vsJqyS4NXQEGKmko",
+    authDomain: "fortera-a1240.firebaseapp.com",
+    projectId: "fortera-a1240",
+    storageBucket: "fortera-a1240.firebasestorage.app",
+    messagingSenderId: "1037196882138",
+    appId: "1:1037196882138:web:0c660d61d76ed6e66575e3",
+    measurementId: "G-B6T39B2308"
+  };
+  try{
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js");
+    const { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js");
+    const { getFirestore, doc, getDoc, setDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js");
+
+    const fbApp = initializeApp(firebaseConfig);
+    const fbAuth = getAuth(fbApp);
+    const fbDb = getFirestore(fbApp);
+    const fbProvider = new GoogleAuthProvider();
+
+    window.FB = {
+      signIn: () => signInWithPopup(fbAuth, fbProvider),
+      signOutUser: () => signOut(fbAuth),
+      onAuth: (cb) => onAuthStateChanged(fbAuth, cb),
+      checkAuthorized: async (email) => {
+        const snap = await getDoc(doc(fbDb, 'autorizados', (email||'').toLowerCase()));
+        return snap.exists();
+      },
+      loadState: async (uid) => {
+        const snap = await getDoc(doc(fbDb, 'usuarios', uid));
+        return snap.exists() ? snap.data().state : null;
+      },
+      saveState: async (uid, stateStr) => {
+        return setDoc(doc(fbDb, 'usuarios', uid), {state: stateStr, updatedAt: serverTimestamp()});
+      }
+    };
+  }catch(e){
+    window.FB = null;
+    console.error('Falha ao iniciar Firebase', e);
+  }finally{
+    window.dispatchEvent(new Event('fb-ready'));
+  }
+})();
+</script>
 <script>
 (function(){
 "use strict";
@@ -793,7 +838,13 @@ return {
 }
 function load(){try{const r=localStorage.getItem(KEY);if(r)return normalize(JSON.parse(r))}catch(e){}return normalize(demoData())}
 let S=load();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let cloudUid=null,fbSaveTimer=null,authEmail='';
+function queueCloudSave(){
+  if(!cloudUid||!window.FB)return;
+  clearTimeout(fbSaveTimer);
+  fbSaveTimer=setTimeout(()=>{window.FB.saveState(cloudUid,JSON.stringify(S)).catch(()=>{})},900);
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}queueCloudSave()}
 const ui={markEntry:null,groupCard:false,editEntry:null,lancConta:'',plnScope:'ALL',invScope:'ALL',invTipo:'ALL',invPre:null,bY:new Date().getFullYear(),bM:new Date().getMonth(),confirm:null,finTab:'resumo',tab:'home',reader:null,page:null,sheet:null,ctx:'PJ',period:String(new Date().getMonth()),year:new Date().getFullYear(),diagMode:'quiz',diagSec:0,del:null,tools:'calc',cv:{},gq:''};
 
 /* ---------- leitor em áudio (voz do aparelho) ---------- */
@@ -1962,6 +2013,7 @@ function viewPerfil(){
   const data=JSON.stringify(S);
   return `<div class="rd-top"><button class="iconbtn" data-act="closeperfil" aria-label="Voltar">${svg('back')}</button><div class="grow" style="font-weight:600">Perfil e ajustes</div></div>
   <div style="padding:8px 18px 60px">
+  ${authEmail?`<div class="card"><h2 class="h-card">Sua conta</h2><p class="sub" style="margin:0 0 10px">Conectada como <b>${esc(authEmail)}</b>. Seus dados ficam salvos na nuvem e sincronizam entre seus aparelhos.</p><button class="btn sec small" data-act="signoutapp">Sair da conta</button></div>`:''}
   <div class="card"><h2 class="h-card">Seu nome</h2><input class="in" id="nome" data-nome value="${esc(S.nome)}" placeholder="Como quer ser chamado(a)?" aria-label="Nome"></div>
   <div class="card"><h2 class="h-card">Aparência</h2><p class="sub" style="margin:0 0 10px">Automático segue a configuração do seu celular ou computador.</p><div class="seg" role="group" aria-label="Tema"><button data-act="settheme" data-v="auto" aria-pressed="${(S.theme||'auto')==='auto'}">Automático</button><button data-act="settheme" data-v="light" aria-pressed="${S.theme==='light'}">Claro</button><button data-act="settheme" data-v="dark" aria-pressed="${S.theme==='dark'}">Escuro</button></div></div>
   <div class="card"><h2 class="h-card">Instalar no celular</h2><p class="sub"><b>iPhone (Safari):</b> compartilhar → “Adicionar à Tela de Início”.<br><b>Android (Chrome):</b> menu ⋮ → “Instalar aplicativo”.</p></div>
@@ -2104,6 +2156,7 @@ document.addEventListener('click',function(ev){
    case 'openinv':setTab('invest');break;
    case 'perfil':ui.page='perfil';ui.del=null;render(true);break;
    case 'closeperfil':ui.page=null;ui.del=null;render(true);break;
+   case 'signoutapp':if(window.FB&&window.FB.signOutUser)window.FB.signOutUser();break;
    case 'hideinstall':S.hideInstall=true;save();render();break;
    case 'open':{ttsStop();const g=GUIDES.find(x=>x.id===+v);ui.reader=g.id;ui.tab='tools';ui.tools='guias';TTS.blocks=ttsBlocks(g);TTS.idx=0;render(true);break}
    case 'closeread':ttsStop();ui.reader=null;render(true);break;
@@ -2330,8 +2383,72 @@ document.addEventListener('change',function(ev){
   else if(['pname','ptipo','pprice','pcost'].includes(t.dataset.ch)){const p=S.fin.PJ.products.find(x=>x.id===t.dataset.id);if(p){const f=t.dataset.ch;if(f==='pname'){const v=t.value.trim();if(v)p.n=v;else t.value=p.n}else if(f==='ptipo')p.tipo=t.value;else{const n=parseNum(t.value),key=f==='pprice'?'preco':'custo';if(n>=0)p[key]=n;else delete p[key]}save()}}
 });
 window.addEventListener('pagehide',ttsStop);
+
+/* ---------- login e controle de acesso (Firebase) ---------- */
+function renderGate(view,extra){
+  const app=document.getElementById('app');
+  if(view==='loading'){
+    app.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px">
+      <img src="${LOGO}" alt="Fortera" style="height:42px">
+      <p class="muted">Carregando...</p>
+    </div>`;
+  }else if(view==='signedout'){
+    app.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px">
+      <img src="${LOGO}" alt="Fortera" style="height:46px">
+      <h1 class="h-page" style="margin:0">Fortera Controle</h1>
+      <p class="sub" style="max-width:320px">Entre com sua conta Google para acessar seus dados financeiros.</p>
+      <button class="btn block" data-gate="signin" style="max-width:280px">Entrar com Google</button>
+    </div>`;
+  }else if(view==='unauthorized'){
+    app.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px">
+      <img src="${LOGO}" alt="Fortera" style="height:46px">
+      <h1 class="h-page" style="margin:0">Acesso não liberado</h1>
+      <p class="sub" style="max-width:340px">O e-mail <b>${esc(extra||'')}</b> ainda não tem acesso ao Fortera Controle. Se você já comprou o Kit Raio-X, aguarde alguns minutos ou fale com a gente.</p>
+      <button class="btn sec" data-gate="signout">Sair e tentar outra conta</button>
+    </div>`;
+  }else if(view==='error'){
+    app.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px">
+      <img src="${LOGO}" alt="Fortera" style="height:42px">
+      <p class="sub" style="max-width:320px">Não foi possível conectar. Verifique sua internet e tente novamente.</p>
+      <button class="btn" data-gate="retry">Tentar de novo</button>
+    </div>`;
+  }
+}
+document.addEventListener('click',function(ev){
+  const g=ev.target.closest('[data-gate]');if(!g)return;
+  const act=g.dataset.gate;
+  if(act==='signin'){renderGate('loading');window.FB.signIn().catch(()=>{renderGate('error')})}
+  else if(act==='signout'){window.FB.signOutUser()}
+  else if(act==='retry'){location.reload()}
+});
+function startAuthFlow(){
+  if(window.FB===null){renderGate('error');return}
+  if(!window.FB){bootApp();return}
+  renderGate('loading');
+  window.FB.onAuth(async(user)=>{
+    if(!user){cloudUid=null;authEmail='';renderGate('signedout');return}
+    renderGate('loading');
+    try{
+      const ok=await window.FB.checkAuthorized(user.email||'');
+      if(!ok){cloudUid=null;renderGate('unauthorized',user.email);return}
+      cloudUid=user.uid;
+      authEmail=user.email||'';
+      const cloud=await window.FB.loadState(user.uid);
+      if(cloud){try{S=normalize(JSON.parse(cloud))}catch(e){}}
+      else{save()}
+      applyTheme();
+      render(true);
+    }catch(e){renderGate('error')}
+  });
+}
+function bootApp(){
+  if(window.FB===undefined){window.addEventListener('fb-ready',bootApp,{once:true});return}
+  startAuthFlow();
+}
 applyTheme();
-render(true);
+renderGate('loading');
+bootApp();
+setTimeout(()=>{if(window.FB===undefined)renderGate('error')},10000);
 })();
 </script>
 </body>
