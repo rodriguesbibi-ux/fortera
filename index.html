@@ -1551,6 +1551,7 @@ function viewInv(){
   h+=`<div class="kpis" style="margin-top:8px"><div class="kpi wide" style="--kc:var(--terra)"><small>Valor final da carteira · ${perLabel}</small><b>${brl(ag.fin)}</b><span class="ks">saldo inicial + aportes + rendimento${ag.resg>0?' − resgates':''}</span></div>
    ${kpi('Saldo inicial',brl(ag.ini),'no começo do período','var(--ink2)')}
    ${kpi('Aportes',brl(ag.apo),'novos valores investidos','var(--sage-d)')}
+   ${kpi('Resgates',brl(ag.resg),'saídas por venda/resgate','var(--terra-m)')}
    ${kpi('Rendimento realizado',`<span class="${ag.rendReal<0?'neg':'pos'}">${brl(ag.rendReal)}</span>`,'dividendos e juros de renda fixa','var(--pri)')}
    ${kpi('Valorização não realizada',`<span class="${ag.rendNRel<0?'neg':'pos'}">${brl(ag.rendNRel)}</span>`,'variação de preço da renda variável','var(--pri)')}
    ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento (realizado + não realizado) ÷ (saldo inicial + aportes)','var(--terra-m)')}
