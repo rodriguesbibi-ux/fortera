@@ -1435,7 +1435,7 @@ function invCalc(ctx,inv,start,end){
     if(e.d>e2)return;
     if(e.t==='open'){ini+=e.v;return}
     if(e.t==='div'){if(e.d>=start)dp+=e.v;return}
-    if(e.t==='resg'&&e.ganho!=null&&e.d>=start){cg+=e.ganho;ccg+=e.custoVend||0}
+    if(e.t==='resg'&&e.ganho!=null&&e.d>=start){cg+=e.ganho;ccg+=(e.custoVend!=null?e.custoVend:(e.v-(e.taxas||0)-e.ganho))}
     const eff=e.t==='apo'?e.v:(e.t==='resg'?-e.v:(e.t==='rend'?e.v:e.y));
     if(e.d<start){ini+=eff;return}
     if(e.t==='apo')ap+=e.v;else if(e.t==='resg')gp+=e.v;else rp+=(e.t==='rend'?e.v:e.y);
