@@ -1499,7 +1499,7 @@ function invPreview(){
   }else p.innerHTML='O valor informado soma ao saldo do investimento como rendimento.';
 }
 function invAgg(items,start,end){
-  const a={ini:0,apo:0,rend:0,resg:0,fin:0};
+  const a={ini:0,apo:0,rend:0,resg:0,fin:0,divid:0,ganhoCap:0,custoGanhoCap:0};
   items.forEach(x=>{const c=invCalc(x.ctx,x.inv,start,end);x.c=c;for(const k in a)a[k]+=c[k]});
   a.base=a.ini+a.apo;a.pct=a.base>0?a.rend/a.base*100:null;return a;
 }
@@ -1551,7 +1551,8 @@ function viewInv(){
    ${kpi('Saldo inicial',brl(ag.ini),'no começo do período','var(--ink2)')}
    ${kpi('Aportes',brl(ag.apo),'novos valores investidos','var(--sage-d)')}
    ${kpi('Rendimento',`<span class="${ag.rend<0?'neg':'pos'}">${brl(ag.rend)}</span>`,ag.resg>0?'resgates de '+brl(ag.resg):'juros, dividendos e valorização','var(--pri)')}
-   ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento ÷ (saldo inicial + aportes)','var(--terra-m)')}</div>`;
+   ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento ÷ (saldo inicial + aportes)','var(--terra-m)')}
+   ${ag.ganhoCap?kpi('Ganho de capital',`<span class="${ag.ganhoCap<0?'neg':'pos'}">${brl(ag.ganhoCap)}</span>`,ag.custoGanhoCap>0?`<span class="${ag.ganhoCap<0?'neg':'pos'}">${pct1(ag.ganhoCap/ag.custoGanhoCap*100)}</span> sobre o custo vendido`:'em vendas no período','var(--sage-d)'):''}</div>`;
   // composição por tipo
   const byT={};items.forEach(x=>{byT[x.inv.tipo]=(byT[x.inv.tipo]||0)+x.c.fin});
   const comp=Object.keys(byT).map(k=>[k,byT[k]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
