@@ -2339,11 +2339,13 @@ function saveEntry(){
   else{const ex=F.entries.find(e=>e.id===ui.editEntry);if(ex){pa=ex.pa||1;pt=ex.pt||1}}
   const gen=!editing&&$('#e_gen').checked&&pt>pa;
   const conta=$('#e_conta')?$('#e_conta').value:'';
-  const isR=catOf(ui.ctx,cat).t==='R';const inv=(catOf(ui.ctx,cat).kind==='res'&&$('#e_inv'))?$('#e_inv').value:'';const prod=(isR&&ui.ctx==='PJ'&&$('#e_prod'))?$('#e_prod').value:'';const qtd=(isR&&ui.ctx==='PJ'&&$('#e_qtd'))?(parseNum($('#e_qtd').value)||1):1;
+  const isR=catOf(ui.ctx,cat).t==='R';const resKind=catOf(ui.ctx,cat).kind==='res';const inv=(resKind&&$('#e_inv'))?$('#e_inv').value:'';const prod=(isR&&ui.ctx==='PJ'&&$('#e_prod'))?$('#e_prod').value:'';const qtd=(isR&&ui.ctx==='PJ'&&$('#e_qtd'))?(parseNum($('#e_qtd').value)||1):1;
   let invQtd,invPreco;
-  if(inv){
+  if(resKind){
     const iq=parseNum($('#e_iqtd')?$('#e_iqtd').value:''),ip=parseNum($('#e_ipreco')?$('#e_ipreco').value:'');
     if(iq>0)invQtd=iq;if(ip>0)invPreco=ip;
+  }
+  if(inv){
     const idi=parseNum($('#e_idi')?$('#e_idi').value:''),ivenc=$('#e_ivenc')?$('#e_ivenc').value:'';
     const ivObj=(S.fin[ui.ctx].invs||[]).find(x=>x.id===inv);
     if(ivObj){if(idi>0)ivObj.diPct=idi;if(ivenc)ivObj.venc=ivenc}
