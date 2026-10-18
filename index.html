@@ -1561,7 +1561,7 @@ function viewInv(){
       else if(e.t==='rend')hist.push({d:e.d,l:'Rendimento',v:e.v,id:e.id,ctx:x.ctx});
       else if(e.d<=todayISO())hist.push({d:e.d,l:'Saldo informado '+brl(e.v)+' · rendimento',v:e.y,id:e.id,ctx:x.ctx})});
     hist.sort((a,b)=>b.d.localeCompare(a.d));
-    h+=`<div class="card"><div class="row between" style="align-items:flex-start"><div class="grow"><b style="font-size:16.5px">${esc(x.inv.n)}</b><div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap"><span class="pill">${esc(x.inv.tipo)}</span><span class="pill bdg-${x.ctx.toLowerCase()}">${x.ctx}</span>${x.inv.diPct>0?`<span class="pill">${x.inv.diPct}% do DI</span>`:''}${x.inv.banco?`<span class="pill">${esc(x.inv.banco)}</span>`:''}</div></div>
+    h+=`<div class="card"><div class="row between" style="align-items:flex-start"><div class="grow"><b style="font-size:16.5px">${esc(x.inv.n)}</b><div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap"><span class="pill">${esc(x.inv.tipo)}</span><span class="pill bdg-${x.ctx.toLowerCase()}">${x.ctx}</span>${x.inv.diPct>0?`<span class="pill">${x.inv.diPct}% do DI</span>`:''}${x.inv.banco?`<span class="pill">${esc(x.inv.banco)}</span>`:''}</div>${x.inv.id===''?`<p class="small muted" style="margin:6px 0 0">Lançamentos de investimento sem um investimento específico escolhido. <button class="link small" data-act="naminv" data-c="${x.ctx}">Dar nome e organizar</button></p>`:''}</div>
     <div style="text-align:right"><b style="font:600 19px 'Poppins',sans-serif">${brl(c.fin)}</b><div class="small muted">valor final</div></div></div>
     ${(()=>{const pu=invPurchases(x.ctx,x.inv);if(!pu.list.length)return'';const multi=pu.list.length>1;
       return `<div class="small muted" style="margin-top:8px">${pu.totalQtd.toLocaleString('pt-BR',{maximumFractionDigits:4})} un.${pu.avgPreco!==null?` · ${multi?'preço médio ':''}${brl(pu.avgPreco)}/un.`:''}</div>
@@ -1583,6 +1583,8 @@ function viewInvs(){
     const F=S.fin[ctx],act=F.invs.filter(i=>!i.arch),arc=F.invs.filter(i=>i.arch);
     h+=`<h2 class="h-card" style="margin:20px 2px 0"><span class="pill bdg-${ctx.toLowerCase()}">${ctx==='PJ'?'Negócio (PJ)':'Pessoal (PF)'}</span></h2>`;
     if(!act.length)h+=`<div class="empty">Nenhum investimento cadastrado.</div>`;
+    {const res={};allCats(ctx).forEach(c=>{if(c.kind==='res')res[c.id]=1});
+    if(F.entries.some(e=>!e.inv&&res[e.cat])||F.invRecs.some(r=>!r.inv))h+=`<div class="card"><b>Investimento não especificado</b><p class="small muted" style="margin:4px 0 0">Você tem lançamentos ou registros de investimento (feitos pelo Controle, por exemplo) que ainda não foram ligados a um investimento com nome. Dê um nome para eles aparecerem aqui normalmente.</p><div style="margin-top:10px"><button class="btn small" data-act="naminv" data-c="${ctx}">Dar nome e organizar</button></div></div>`;}
     act.forEach(i=>{
       const calcVal=(i.qtd>0&&i.preco>0)?i.qtd*i.preco:null;
       const ctxGoals=S.goals.filter(g=>g.ctx===ctx);
@@ -2105,6 +2107,14 @@ function sheetHTML(){
     <div class="grid2"><div><label class="f" for="ni_s">Saldo inicial (R$)</label><input class="in" id="ni_s" inputmode="decimal" placeholder="opcional"></div><div><label class="f" for="ni_d">Data do saldo</label><input class="in" id="ni_d" type="date" value="${todayISO()}"></div></div>
     <div class="row" style="gap:10px;margin-top:14px"><button class="btn sec grow" data-act="closesheet">Cancelar</button><button class="btn block grow" data-act="addinv">Cadastrar</button></div></div></div>`;
   }
+  if(ui.sheet==='naminv'){
+    const ctx=ui.naminvCtx==='PJ'?'PJ':'PF';
+    return `<div class="scrim" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true" aria-label="Nomear investimento" data-stop><h3>Nomear investimento</h3>
+    <p class="sub">Dê um nome para os lançamentos e registros de investimento ainda não especificados do ${ctx==='PJ'?'Negócio (PJ)':'Pessoal (PF)'}. Eles passam a fazer parte deste investimento automaticamente.</p>
+    <label class="f" for="nm_n">Nome</label><input class="in" id="nm_n" placeholder="Ex.: Tesouro Direto, Vale3">
+    <label class="f" for="nm_t">Tipo</label><select class="in" id="nm_t">${S.invTipos.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+    <div class="row" style="gap:10px;margin-top:14px"><button class="btn sec grow" data-act="closesheet">Cancelar</button><button class="btn block grow" data-act="savenaminv" data-c="${ctx}">Salvar</button></div></div></div>`;
+  }
   if(ui.sheet==='invrec'){
     const items=invItems(ui.invScope,'ALL');const pre=ui.invPre||{};const tp=pre.tipo||'saldo';
     if(!items.length)return `<div class="scrim" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true" data-stop><h3>Atualizar investimento</h3><p class="sub">Cadastre um investimento primeiro.</p><div class="row" style="gap:10px;margin-top:14px"><button class="btn sec" data-act="closesheet">Fechar</button><div class="grow"><button class="btn block" data-act="invs">Cadastrar investimento</button></div></div></div></div>`;
@@ -2224,6 +2234,8 @@ document.addEventListener('click',function(ev){
    case 'addtipo':{const n=$('#nt_n').value.trim();if(!n){toast('Digite o nome do tipo');break}if(S.invTipos.some(t=>t.toLowerCase()===n.toLowerCase())){toast('Esse tipo já existe');break}S.invTipos.push(n);save();render();break}
    case 'deltipo':{if(ui.del!=='tipo:'+v){ui.del='tipo:'+v;render();break}S.invTipos=S.invTipos.filter(t=>t!==v);ui.del=null;save();render();break}
    case 'usecalcval':{const i=S.fin[el.dataset.c].invs.find(x=>x.id===v);if(i&&i.qtd>0&&i.preco>0){i.saldoIni=Math.round(i.qtd*i.preco*100)/100;if(!i.dataIni)i.dataIni=todayISO();save();render();toast('Saldo inicial atualizado')}break}
+   case 'naminv':ui.naminvCtx=el.dataset.c==='PJ'?'PJ':'PF';ui.sheet='naminv';render();break;
+   case 'savenaminv':{const n=$('#nm_n').value.trim();if(!n){toast('Digite o nome do investimento');break}const c=el.dataset.c==='PJ'?'PJ':'PF';const F=S.fin[c],res={};allCats(c).forEach(cc=>{if(cc.kind==='res')res[cc.id]=1});const i={id:uid(),n,tipo:$('#nm_t').value};F.invs.push(i);F.entries.forEach(e=>{if(!e.inv&&res[e.cat])e.inv=i.id});F.invRecs.forEach(r=>{if(!r.inv)r.inv=i.id});save();ui.sheet=null;ui.naminvCtx=null;render();toast('Investimento nomeado e organizado');break}
    case 'addinv':{const n=$('#ni_n').value.trim();if(!n){toast('Digite o nome do investimento');break}const c=$('#ni_c').value;let s=parseNum($('#ni_s').value);const i={id:uid(),n,tipo:$('#ni_t').value};const banco=$('#ni_banco').value.trim();if(banco)i.banco=banco;const qtd=parseNum($('#ni_qtd').value);if(qtd>0)i.qtd=qtd;const preco=parseNum($('#ni_preco').value);if(preco>0)i.preco=preco;if(!(s>0)&&qtd>0&&preco>0)s=Math.round(qtd*preco*100)/100;if(s>0){i.saldoIni=s;i.dataIni=$('#ni_d').value||todayISO()}const di=parseNum($('#ni_di').value);if(di>0)i.diPct=di;const venc=$('#ni_venc').value;if(venc)i.venc=venc;const ngoals=[];document.querySelectorAll('[data-nigoal]').forEach(el=>{const n=parseNum(el.value);if(n>0)ngoals.push({id:el.dataset.nigoal,pct:n})});if(ngoals.length)i.goals=ngoals;S.fin[c].invs.push(i);save();ui.sheet=null;render();toast('Investimento cadastrado');break}
    case 'delinv':{const c=el.dataset.c,k='inv:'+c+v;if(ui.del!==k){ui.del=k;render();break}const F=S.fin[c];if(invUsed(c,v)){F.invs.find(i=>i.id===v).arch=true;toast('Arquivado: continua nos relatórios')}else{F.invs=F.invs.filter(i=>i.id!==v);toast('Removido')}ui.del=null;save();render();break}
    case 'uninv':{const i=S.fin[el.dataset.c].invs.find(x=>x.id===v);if(i)delete i.arch;save();render();break}
