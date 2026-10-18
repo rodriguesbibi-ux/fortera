@@ -1250,6 +1250,29 @@ function entryRow(ctx,e){
   return `<div class="entry"><div class="date">${e.date.slice(8)}/${e.date.slice(5,7)}</div><div class="grow"><div style="font-weight:500">${esc(e.desc||c.n)}${e.recId?' <span class=\'pill\' style=\'margin-left:4px\'>Recorrente</span>':''}${statusPill}</div><div class="small muted">${esc(c.n)}${e.prod?' · '+esc(prodName(e.prod)):''}${e.inv?' · '+esc(invName(ctx,e.inv)):''}${e.conta?' · '+esc(accName(ctx,e.conta)):''}${!isR?' · '+esc(e.fv||'Variável'):''}${e.pt>1?` · parcela ${e.pa}/${e.pt}`:''}</div></div><div style="text-align:right"><div class="${isR?'pos':''}" style="font-weight:600">${isR?'+':'−'} ${brl(e.valor)}</div><div class="row" style="gap:10px;justify-content:flex-end;margin-top:2px;flex-wrap:wrap">${(!e.fromRec&&!e.xferId)?statusAct:''}${(!e.fromRec&&!e.xferId)?`<button class="small muted" style="font-weight:600;text-decoration:underline" data-act="editentry" data-v="${e.id}">Editar</button>`:''}<button class="small ${ui.del===e.id?'neg':'muted'}" style="font-weight:600;text-decoration:underline" data-act="del" data-v="${e.id}">${ui.del===e.id?'Confirmar exclusão':'Excluir'}</button></div></div></div>`;
 }
 
+function mkBalanceAsOf(ctx,selAcc){
+  const F=S.fin[ctx];
+  if(selAcc){
+    const base=selAcc.saldoIni||0,dataIni=selAcc.dataIni;
+    const ents=F.entries.filter(e=>e.conta===selAcc.id&&e.pago&&(!dataIni||e.date>=dataIni));
+    return d=>base+ents.filter(e=>e.date<=d).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0);
+  }
+  const ci=F.caixaM?F.caixaM+'-01':'',base=F.caixa||0;
+  const ents=F.entries.filter(e=>e.pago&&(!ci||e.date>=ci));
+  return d=>base+ents.filter(e=>e.date<=d).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0);
+}
+function dayGroupsHTML(ctx,items,balFn){
+  let h='',curDate=null;
+  items.forEach(e=>{
+    if(e.date!==curDate){
+      curDate=e.date;
+      const bal=balFn(curDate);
+      h+=`<div class="row between" style="margin:16px 0 4px;align-items:baseline;border-top:1px solid var(--line);padding-top:8px"><span class="small muted" style="font-weight:600">${curDate.slice(8)}/${curDate.slice(5,7)}/${curDate.slice(0,4)}</span><span class="small" style="font-weight:600">Saldo do dia: <b class="${bal<0?'neg':''}">${brl(bal)}</b></span></div>`;
+    }
+    h+=entryRow(ctx,e);
+  });
+  return h;
+}
 function viewLanc(ctx,sm){
   let h=`<div class="row" style="gap:8px;margin-top:4px;flex-wrap:wrap"><button class="btn sec small" data-act="import" style="border-color:var(--terra);color:var(--terra-d)">${svg('upload')} Importar lançamentos</button><button class="btn sec small" data-act="downloadtemplate" style="border-color:var(--terra);color:var(--terra-d)">Baixar modelo (CSV)</button></div>`;
   h+=`<div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">${ctx==='PJ'?'<button class="btn ghost small" data-act="prods">Produtos e serviços</button>':''}<button class="btn ghost small" data-act="orc">Orçamento mensal</button><button class="btn ghost small" data-act="cats">Categorias</button><button class="btn ghost small" data-act="contas">Contas e cartões</button><button class="btn ghost small" data-act="sheet" data-v="caixa">Caixa inicial</button><button class="btn ghost small" data-act="sheet" data-v="transfer">Transferência</button><button class="btn ghost small" data-act="sheet" data-v="recur">Despesa recorrente</button></div>`;
@@ -1273,7 +1296,7 @@ function viewLanc(ctx,sm){
       h+=`<details class="term" open style="margin-bottom:6px"><summary><span class="grow"><b>💳 ${esc(g.card.n)}</b><span class="small muted" style="display:block;font-weight:400">${g.card.vencDia?`Vencimento todo dia ${g.card.vencDia}`:'Sem dia de vencimento cadastrado'} · ${g.items.length} lançamento(s)</span></span><b class="${total<0?'pos':''}">${brl(total)}</b></summary>${g.items.map(e=>entryRow(ctx,e)).join('')}</details>`;
     });
     if(rest.length){h+=`<p class="small muted" style="font-weight:600;margin:14px 0 4px">Outros lançamentos</p>`;rest.forEach(e=>h+=entryRow(ctx,e))}
-  }else list.forEach(e=>h+=entryRow(ctx,e));
+  }else h+=dayGroupsHTML(ctx,list,mkBalanceAsOf(ctx,accs.find(a=>a.id===ui.lancConta)));
   h+=`</div>`;
   return h;
 }
