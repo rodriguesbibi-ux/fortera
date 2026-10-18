@@ -1373,8 +1373,9 @@ function viewOrc0(){
   h+=`<div class="kpis" style="margin:10px 0"><div class="kpi" style="--kc:var(--sage-d)"><small>Receitas orçadas</small><b id="t-r" class="pos">R$ 0,00</b></div><div class="kpi" style="--kc:var(--terra-m)"><small>Despesas orçadas</small><b id="t-d">R$ 0,00</b></div><div class="kpi wide2" style="--kc:var(--pri)"><small>Resultado orçado de ${MES[m]}</small><b id="t-x">R$ 0,00</b></div></div>`;
   groupsOf(ctx).forEach(g=>{
     const cs=allCats(ctx).filter(c=>c.gid===g.id&&!c.arch);if(!cs.length)return;
-    h+=`<div class="card"><h2 class="h-card" style="margin-bottom:0">${esc(g.n)}</h2><p class="small muted" style="margin:0 0 4px">${g.t==='R'?'Quanto você espera receber':'Limite de gasto'} em ${MES[m]}</p>`;
-    cs.forEach(c=>{const v=B[c.id];h+=`<label class="f" for="bi_${c.id}">${esc(c.n)}</label><input class="in" id="bi_${c.id}" data-bud="${c.id}" inputmode="decimal" placeholder="0,00" value="${v?String(v).replace('.',','):''}">`});
+    const gsum=cs.reduce((a,c)=>a+(B[c.id]||0),0);
+    h+=`<div class="card"><div class="row between" style="align-items:baseline;gap:8px"><h2 class="h-card" style="margin-bottom:0">${esc(g.n)}</h2><b id="gt_${g.id}" style="font:600 17px 'Poppins',sans-serif;white-space:nowrap">${brl(gsum)}</b></div><p class="small muted" style="margin:0 0 4px">${g.t==='R'?'Quanto você espera receber':'Limite de gasto'} em ${MES[m]}</p>`;
+    cs.forEach(c=>{const v=B[c.id];h+=`<label class="f" for="bi_${c.id}">${esc(c.n)}</label><input class="in" id="bi_${c.id}" data-bud="${c.id}" data-gid="${g.id}" inputmode="decimal" placeholder="0,00" value="${v?String(v).replace('.',','):''}">`});
     h+=`</div>`;
   });
   h+=`<button class="btn sec block" data-act="cats">Editar categorias e subcategorias</button><p class="disc">Os valores são salvos automaticamente ao digitar.</p></div>`;
@@ -2442,7 +2443,8 @@ document.addEventListener('input',function(ev){
   else if(t.hasAttribute('data-irpv')){invPreview()}
   else if(t.hasAttribute('data-eval')){t.dataset.auto=''}
   else if(t.hasAttribute('data-goalpct')){goalPctSum()}
-  else if(t.hasAttribute('data-bud')){const k=bKey(ui.bY,ui.bM),F=S.fin[ui.ctx];F.budgetM[k]=F.budgetM[k]||{};const n=parseNum(t.value);if(n>0)F.budgetM[k][t.dataset.bud]=n;else delete F.budgetM[k][t.dataset.bud];save();budgetTotals()}
+  else if(t.hasAttribute('data-bud')){const k=bKey(ui.bY,ui.bM),F=S.fin[ui.ctx];F.budgetM[k]=F.budgetM[k]||{};const n=parseNum(t.value);if(n>0)F.budgetM[k][t.dataset.bud]=n;else delete F.budgetM[k][t.dataset.bud];save();budgetTotals();
+    const gt=$('#gt_'+t.dataset.gid);if(gt){let s=0;document.querySelectorAll('[data-gid="'+t.dataset.gid+'"]').forEach(el=>{const n2=parseNum(el.value);if(n2>0)s+=n2});gt.textContent=brl(s)}}
   else if(t.dataset.ch==='igoalpct'){const i=S.fin[t.dataset.c].invs.find(x=>x.id===t.dataset.id);if(i){const n=parseNum(t.value);i.goals=i.goals||[];const ex=i.goals.find(x=>x.id===t.dataset.gid);if(n>0){if(ex)ex.pct=n;else i.goals.push({id:t.dataset.gid,pct:n})}else{i.goals=i.goals.filter(x=>x.id!==t.dataset.gid)}save();const sEl=$('#igs_'+i.id);if(sEl){const tot=i.goals.reduce((a,x)=>a+x.pct,0);sEl.textContent=tot>0?`${tot}% distribuído`:'';sEl.className='small '+(tot>100?'neg':'muted')}}}
 });
 document.addEventListener('change',function(ev){
