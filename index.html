@@ -1421,7 +1421,7 @@ function invRun(ctx,inv,extra){
   const evs=[];
   if(inv.saldoIni>0)evs.push({d:inv.dataIni||'0000-00-00',t:'open',v:inv.saldoIni,o:0});
   F.entries.forEach(e=>{if((e.inv||'')===inv.id&&res[e.cat]&&e.pago)evs.push({d:e.date,t:'apo',v:e.valor,o:1})});
-  F.invRecs.forEach(r=>{if(r.inv===inv.id)evs.push({d:r.date,t:r.tipo==='resg'?'resg':(r.tipo==='saldo'?'saldo':(r.tipo==='div'?'div':'rend')),v:r.valor,id:r.id,o:r.tipo==='saldo'?4:(r.tipo==='resg'?2:(r.tipo==='div'?5:3))})});
+  F.invRecs.forEach(r=>{if(r.inv===inv.id)evs.push({d:r.date,t:r.tipo==='resg'?'resg':(r.tipo==='saldo'?'saldo':(r.tipo==='div'?'div':'rend')),v:r.valor,id:r.id,o:r.tipo==='saldo'?4:(r.tipo==='resg'?2:(r.tipo==='div'?5:3)),ganho:r.tipo==='resg'?r.ganho:undefined,qtdVend:r.tipo==='resg'?r.qtdVend:undefined,taxas:r.tipo==='resg'?r.taxas:undefined})});
   if(extra)evs.push(Object.assign({o:extra.t==='saldo'?4:3},extra));
   evs.sort((a,b)=>a.d<b.d?-1:(a.d>b.d?1:a.o-b.o));
   let P=0;
@@ -1430,16 +1430,17 @@ function invRun(ctx,inv,extra){
 }
 function invCalc(ctx,inv,start,end){
   const t=todayISO(),e2=end>t?t:end,run=invRun(ctx,inv);
-  let ini=0,ap=0,rp=0,gp=0,dp=0;
+  let ini=0,ap=0,rp=0,gp=0,dp=0,cg=0;
   run.evs.forEach(e=>{
     if(e.d>e2)return;
     if(e.t==='open'){ini+=e.v;return}
     if(e.t==='div'){if(e.d>=start)dp+=e.v;return}
+    if(e.t==='resg'&&e.ganho!=null&&e.d>=start)cg+=e.ganho;
     const eff=e.t==='apo'?e.v:(e.t==='resg'?-e.v:(e.t==='rend'?e.v:e.y));
     if(e.d<start){ini+=eff;return}
     if(e.t==='apo')ap+=e.v;else if(e.t==='resg')gp+=e.v;else rp+=(e.t==='rend'?e.v:e.y);
   });
-  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,fin:ini+ap+rp-gp,base:ini+ap};
+  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,fin:ini+ap+rp-gp,base:ini+ap};
 }
 function resgateCat(ctx){
   const F=S.fin[ctx];let c=F.cfg.cats.find(x=>x.sys==='resgate');
@@ -1458,8 +1459,9 @@ function dividCat(ctx){
 function invPreview(){
   const p=$('#ir_prev');if(!p||!$('#ir_inv'))return;
   const key=$('#ir_inv').value.split('|'),ctx=key[0],id=key[1]||'',tipo=$('#ir_tipo').value;
-  const lbl=$('#ir_vlbl');if(lbl)lbl.textContent=tipo==='saldo'?'Saldo atual (R$)':'Valor (R$)';
+  const lbl=$('#ir_vlbl');if(lbl)lbl.textContent=tipo==='saldo'?'Saldo atual (R$)':(tipo==='resg'?'Valor da venda (R$)':'Valor (R$)');
   const inv=invFind(ctx,id),cls=n=>n<0?'neg':'pos';
+  const resgWrap=$('#ir_resgwrap');if(resgWrap)resgWrap.hidden=(tipo!=='resg');
   const puWrap=$('#ir_puwrap'),puCalc=$('#ir_pucalc'),puInput=$('#ir_pu');
   if(puWrap){
     const hasQtd=tipo==='saldo'&&inv&&inv.qtd>0;
@@ -1480,7 +1482,18 @@ function invPreview(){
     p.innerHTML=`Valor esperado sem rendimento: <b>${brl(ev.pre)}</b><br>Rendimento calculado: <b class="${cls(ev.y)}">${brl(ev.y)}</b>${ev.pre>0?` (${pct1(ev.y/ev.pre*100)} sobre o valor esperado)`:''}`;
   }else if(tipo==='resg'){
     const pos=invRun(ctx,inv).pos;
-    p.innerHTML=`Será lançado como <b>receita</b> ${ctx==='PJ'?'no módulo Negócio (PJ)':'no módulo Pessoal (PF)'}, na categoria “Resgate de investimentos”.${!isNaN(v)&&v>pos?`<br><span class="neg">O valor é maior que o saldo calculado (${brl(pos)}).</span>`:''}`;
+    const qv=parseNum($('#ir_qv')?$('#ir_qv').value:'')||0,taxas=parseNum($('#ir_taxas')?$('#ir_taxas').value:'')||0;
+    let extra='';
+    if(qv>0){
+      const pu=invPurchases(ctx,inv);
+      if(pu.avgPreco!==null){
+        const custo=qv*pu.avgPreco,ganho=(isNaN(v)?0:v)-taxas-custo;
+        extra=`<br>Custo (preço médio de compra): ${qv.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. × ${brl(pu.avgPreco)} = ${brl(custo)}<br>Ganho de capital estimado: <b class="${cls(ganho)}">${brl(ganho)}</b>`;
+      }else{
+        extra=`<br><span class="muted">Cadastre as compras deste investimento (quantidade e preço) para o app calcular o ganho de capital automaticamente.</span>`;
+      }
+    }
+    p.innerHTML=`Será lançado como <b>receita</b> ${ctx==='PJ'?'no módulo Negócio (PJ)':'no módulo Pessoal (PF)'}, na categoria “Resgate de investimentos”.${!isNaN(v)&&v>pos?`<br><span class="neg">O valor é maior que o saldo calculado (${brl(pos)}).</span>`:''}${extra}`;
   }else if(tipo==='div'){
     p.innerHTML=`Será lançado como <b>receita</b> ${ctx==='PJ'?'no módulo Negócio (PJ)':'no módulo Pessoal (PF)'}, na categoria “Dividendos recebidos”. Aparece no card do investimento, mas não entra no saldo final dele.`;
   }else p.innerHTML='O valor informado soma ao saldo do investimento como rendimento.';
@@ -1556,7 +1569,7 @@ function viewInv(){
     const c=x.c,pct=c.base>0?c.rend/c.base*100:null,key=x.ctx+'|'+x.inv.id;
     const hist=[];
     invRun(x.ctx,x.inv).evs.forEach(e=>{if(e.t==='open')return;if(e.t==='apo'){if(e.d<=todayISO())hist.push({d:e.d,l:'Aporte',v:e.v});return}
-      if(e.t==='resg')hist.push({d:e.d,l:'Resgate (virou receita)',v:-e.v,id:e.id,ctx:x.ctx});
+      if(e.t==='resg')hist.push({d:e.d,l:'Resgate (virou receita)'+(e.ganho!=null?' · ganho de capital '+brl(e.ganho):''),v:-e.v,id:e.id,ctx:x.ctx});
       else if(e.t==='div')hist.push({d:e.d,l:'Dividendos (virou receita)',v:e.v,id:e.id,ctx:x.ctx});
       else if(e.t==='rend')hist.push({d:e.d,l:'Rendimento',v:e.v,id:e.id,ctx:x.ctx});
       else if(e.d<=todayISO())hist.push({d:e.d,l:'Saldo informado '+brl(e.v)+' · rendimento',v:e.y,id:e.id,ctx:x.ctx})});
@@ -1569,7 +1582,7 @@ function viewInv(){
     })()}
     ${x.inv.venc?(()=>{const d=Math.round((new Date(x.inv.venc+'T12:00:00')-new Date(todayISO()+'T12:00:00'))/86400000);return `<div class="small" style="margin-top:4px"><span class="${d<0?'neg':(d<=30?'':'muted')}">Vencimento: ${x.inv.venc.slice(8)}/${x.inv.venc.slice(5,7)}/${x.inv.venc.slice(0,4)}${d<0?' · vencido':(d<=30?' · em '+d+' dia(s)':'')}</span></div>`})():''}
     ${(x.inv.goals&&x.inv.goals.length)?`<div class="small" style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap">${x.inv.goals.map(a=>{const g=S.goals.find(gg=>gg.id===a.id);return g?`<button class="link" data-act="editgoal" data-v="${g.id}">${svg('flag')} ${esc(g.n)} (${a.pct}%)</button>`:''}).join('')}</div>`:''}
-    <div class="grid2 small" style="margin-top:12px;gap:8px"><div class="muted">Saldo inicial<br><b style="color:var(--ink)">${brl(c.ini)}</b></div><div class="muted">Aportes<br><b style="color:var(--ink)">${brl(c.apo)}</b></div><div class="muted">Rendimento<br><b class="${c.rend<0?'neg':'pos'}">${brl(c.rend)}</b></div><div class="muted">Rentabilidade<br><b class="${pct!==null&&pct<0?'neg':'pos'}">${pct===null?'–':pct1(pct)}</b></div>${c.divid>0?`<div class="muted">Dividendos recebidos<br><b class="pos">${brl(c.divid)}</b><span class="small muted" style="display:block;font-weight:400">não entra no saldo final</span></div>`:''}</div>
+    <div class="grid2 small" style="margin-top:12px;gap:8px"><div class="muted">Saldo inicial<br><b style="color:var(--ink)">${brl(c.ini)}</b></div><div class="muted">Aportes<br><b style="color:var(--ink)">${brl(c.apo)}</b></div><div class="muted">Rendimento<br><b class="${c.rend<0?'neg':'pos'}">${brl(c.rend)}</b></div><div class="muted">Rentabilidade<br><b class="${pct!==null&&pct<0?'neg':'pos'}">${pct===null?'–':pct1(pct)}</b></div>${c.divid>0?`<div class="muted">Dividendos recebidos<br><b class="pos">${brl(c.divid)}</b><span class="small muted" style="display:block;font-weight:400">não entra no saldo final</span></div>`:''}${c.ganhoCap?`<div class="muted">Ganho de capital (vendas)<br><b class="${c.ganhoCap<0?'neg':'pos'}">${brl(c.ganhoCap)}</b></div>`:''}</div>
     <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn small" data-act="invrec" data-v="${esc(key)}" data-k="saldo">Atualizar saldo</button><button class="btn ghost small" data-act="invrec" data-v="${esc(key)}" data-k="rend">Rendimento</button><button class="btn ghost small" data-act="invrec" data-v="${esc(key)}" data-k="div">Dividendos</button><button class="btn ghost small" data-act="invrec" data-v="${esc(key)}" data-k="resg">Resgate</button></div>
     ${hist.length?`<details class="term" style="margin-top:10px;border-bottom:0"><summary>Histórico (${hist.length})</summary>${hist.slice(0,25).map(r=>`<div class="row between small" style="margin-top:8px"><span>${r.d.slice(8)}/${r.d.slice(5,7)}/${r.d.slice(0,4)} · ${r.l}</span><span class="row" style="gap:8px"><b class="${r.v<0?'neg':''}">${brl(r.v)}</b>${r.id?`<button class="small ${ui.del==='rec:'+r.id?'neg':'muted'}" style="text-decoration:underline;font-weight:600" data-act="delrec" data-v="${r.id}" data-c="${r.ctx}">${ui.del==='rec:'+r.id?'Confirmar':'Excluir'}</button>`:''}</span></div>`).join('')}</details>`:''}</div>`;
   });
@@ -2123,6 +2136,7 @@ function sheetHTML(){
     <label class="f" for="ir_tipo">O que você quer registrar?</label><select class="in" id="ir_tipo" data-irpv><option value="saldo" ${tp==='saldo'?'selected':''}>Saldo atual (o app calcula o rendimento)</option><option value="rend" ${tp==='rend'?'selected':''}>Rendimento (eu informo o valor rendido)</option><option value="div" ${tp==='div'?'selected':''}>Dividendos (recebidos em dinheiro)</option><option value="resg" ${tp==='resg'?'selected':''}>Resgate (retirada de dinheiro)</option></select>
     <div id="ir_puwrap" hidden><label class="f" for="ir_pu">Preço atual por unidade (R$)</label><input class="in" id="ir_pu" data-irpv inputmode="decimal" placeholder="Ex.: 32,50"><p class="small muted" id="ir_pucalc" style="margin:6px 0 0"></p></div>
     <div class="grid2"><div><label class="f" id="ir_vlbl" for="ir_val">Saldo atual (R$)</label><input class="in" id="ir_val" data-irpv inputmode="decimal" placeholder="0,00"></div><div><label class="f" for="ir_date">Data</label><input class="in" id="ir_date" data-irpv type="date" value="${todayISO()}"></div></div>
+    <div id="ir_resgwrap" hidden><div class="grid2"><div><label class="f" for="ir_qv">Quantidade vendida (opcional)</label><input class="in" id="ir_qv" data-irpv inputmode="decimal" placeholder="un."></div><div><label class="f" for="ir_taxas">Taxas (R$, opcional)</label><input class="in" id="ir_taxas" data-irpv inputmode="decimal" placeholder="0,00"></div></div><p class="small muted" style="margin:4px 0 0">Informando a quantidade vendida, o app calcula o ganho de capital (valor da venda menos taxas menos preço médio de compra × quantidade).</p></div>
     <div id="ir_prev" class="modbanner" style="margin:12px 0 0;display:block;font-size:14px;--pri:var(--ink);--mod-soft:var(--surface2)"></div>
     <div id="ir_err" class="neg small" style="min-height:20px;margin-top:6px"></div>
     <div class="row" style="gap:10px"><button class="btn sec" data-act="closesheet">Cancelar</button><div class="grow"><button class="btn block" data-act="saveinvrec">Salvar</button></div></div></div></div>`;
@@ -2288,10 +2302,13 @@ function saveInvRec(){
     save();ui.sheet=null;render();toast('Dividendo lançado como receita '+(ctx==='PJ'?'no Negócio (PJ)':'no Pessoal (PF)'));return;
   }
   if(v<=0){err.textContent='O resgate deve ser maior que zero.';return}
-  const rid=uid(),eid=Date.now(),cat=resgateCat(ctx),nm=invFind(ctx,id).n;
-  F.invRecs.push({id:rid,inv:id,date,tipo:'resg',valor:v,entryId:eid});
+  const rid=uid(),eid=Date.now(),cat=resgateCat(ctx),invObj=F.invs.find(i=>i.id===id)||{id,qtd:0,preco:0},nm=invFind(ctx,id).n;
+  const qv=parseNum($('#ir_qv')?$('#ir_qv').value:'')||0,taxas=parseNum($('#ir_taxas')?$('#ir_taxas').value:'')||0;
+  let ganho;
+  if(qv>0){const pu=invPurchases(ctx,invObj);if(pu.avgPreco!==null)ganho=Math.round((v-taxas-qv*pu.avgPreco)*100)/100}
+  F.invRecs.push({id:rid,inv:id,date,tipo:'resg',valor:v,entryId:eid,qtdVend:qv>0?qv:undefined,taxas:taxas>0?taxas:undefined,ganho});
   F.entries.push({id:eid,date,cat,desc:'Resgate · '+nm,valor:v,fv:'Variável',pa:1,pt:1,qtd:1,fromRec:rid,pago:true});
-  save();ui.sheet=null;render();toast('Resgate lançado como receita '+(ctx==='PJ'?'no Negócio (PJ)':'no Pessoal (PF)'));
+  save();ui.sheet=null;render();toast(ganho!==undefined?'Resgate lançado · ganho de capital '+brl(ganho):'Resgate lançado como receita '+(ctx==='PJ'?'no Negócio (PJ)':'no Pessoal (PF)'));
 }
 
 function saveGoal(){
