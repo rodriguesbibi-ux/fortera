@@ -1421,7 +1421,7 @@ function invRun(ctx,inv,extra){
   const evs=[];
   if(inv.saldoIni>0)evs.push({d:inv.dataIni||'0000-00-00',t:'open',v:inv.saldoIni,o:0});
   F.entries.forEach(e=>{if((e.inv||'')===inv.id&&res[e.cat]&&e.pago)evs.push({d:e.date,t:'apo',v:e.valor,o:1})});
-  F.invRecs.forEach(r=>{if(r.inv===inv.id)evs.push({d:r.date,t:r.tipo==='resg'?'resg':(r.tipo==='saldo'?'saldo':(r.tipo==='div'?'div':'rend')),v:r.valor,id:r.id,o:r.tipo==='saldo'?4:(r.tipo==='resg'?2:(r.tipo==='div'?5:3)),ganho:r.tipo==='resg'?r.ganho:undefined,qtdVend:r.tipo==='resg'?r.qtdVend:undefined,taxas:r.tipo==='resg'?r.taxas:undefined})});
+  F.invRecs.forEach(r=>{if(r.inv===inv.id)evs.push({d:r.date,t:r.tipo==='resg'?'resg':(r.tipo==='saldo'?'saldo':(r.tipo==='div'?'div':'rend')),v:r.valor,id:r.id,o:r.tipo==='saldo'?4:(r.tipo==='resg'?2:(r.tipo==='div'?5:3)),ganho:r.tipo==='resg'?r.ganho:undefined,qtdVend:r.tipo==='resg'?r.qtdVend:undefined,taxas:r.tipo==='resg'?r.taxas:undefined,custoVend:r.tipo==='resg'?r.custoVend:undefined})});
   if(extra)evs.push(Object.assign({o:extra.t==='saldo'?4:3},extra));
   evs.sort((a,b)=>a.d<b.d?-1:(a.d>b.d?1:a.o-b.o));
   let P=0;
@@ -1430,17 +1430,17 @@ function invRun(ctx,inv,extra){
 }
 function invCalc(ctx,inv,start,end){
   const t=todayISO(),e2=end>t?t:end,run=invRun(ctx,inv);
-  let ini=0,ap=0,rp=0,gp=0,dp=0,cg=0;
+  let ini=0,ap=0,rp=0,gp=0,dp=0,cg=0,ccg=0;
   run.evs.forEach(e=>{
     if(e.d>e2)return;
     if(e.t==='open'){ini+=e.v;return}
     if(e.t==='div'){if(e.d>=start)dp+=e.v;return}
-    if(e.t==='resg'&&e.ganho!=null&&e.d>=start)cg+=e.ganho;
+    if(e.t==='resg'&&e.ganho!=null&&e.d>=start){cg+=e.ganho;ccg+=e.custoVend||0}
     const eff=e.t==='apo'?e.v:(e.t==='resg'?-e.v:(e.t==='rend'?e.v:e.y));
     if(e.d<start){ini+=eff;return}
     if(e.t==='apo')ap+=e.v;else if(e.t==='resg')gp+=e.v;else rp+=(e.t==='rend'?e.v:e.y);
   });
-  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,fin:ini+ap+rp-gp,base:ini+ap};
+  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,fin:ini+ap+rp-gp,base:ini+ap};
 }
 function resgateCat(ctx){
   const F=S.fin[ctx];let c=F.cfg.cats.find(x=>x.sys==='resgate');
@@ -1523,7 +1523,9 @@ function invPurchases(ctx,inv){
   (S.fin[ctx].entries||[]).forEach(e=>{if(e.inv===inv.id&&e.invQtd>0&&e.invPreco>0&&e.pago)list.push({date:e.date,qtd:e.invQtd,preco:e.invPreco,origem:'Compra',id:e.id});});
   list.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const totalQtd=list.reduce((a,x)=>a+x.qtd,0),totalCusto=list.reduce((a,x)=>a+x.qtd*x.preco,0);
-  return {list,totalQtd,avgPreco:totalQtd>0?totalCusto/totalQtd:null};
+  const qtdVendida=(S.fin[ctx].invRecs||[]).filter(r=>r.inv===inv.id&&r.tipo==='resg'&&r.qtdVend>0).reduce((a,r)=>a+r.qtdVend,0);
+  const qtdPos=Math.max(0,totalQtd-qtdVendida);
+  return {list,totalQtd,avgPreco:totalQtd>0?totalCusto/totalQtd:null,qtdVendida,qtdPos};
 }
 
 
@@ -1566,7 +1568,7 @@ function viewInv(){
   // cards por investimento
   h+=`<h2 class="h-card" style="margin:18px 2px 0">Investimentos</h2>`;
   items.forEach(x=>{
-    const c=x.c,pct=c.base>0?c.rend/c.base*100:null,key=x.ctx+'|'+x.inv.id;
+    const c=invCalc(x.ctx,x.inv,'0000-00-00',todayISO()),pct=c.base>0?c.rend/c.base*100:null,key=x.ctx+'|'+x.inv.id;
     const hist=[];
     invRun(x.ctx,x.inv).evs.forEach(e=>{if(e.t==='open')return;if(e.t==='apo'){if(e.d<=todayISO())hist.push({d:e.d,l:'Aporte',v:e.v});return}
       if(e.t==='resg')hist.push({d:e.d,l:'Resgate (virou receita)'+(e.ganho!=null?' · ganho de capital '+brl(e.ganho):''),v:-e.v,id:e.id,ctx:x.ctx});
@@ -1577,12 +1579,12 @@ function viewInv(){
     h+=`<div class="card"><div class="row between" style="align-items:flex-start"><div class="grow"><b style="font-size:16.5px">${esc(x.inv.n)}</b><div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap"><span class="pill">${esc(x.inv.tipo)}</span><span class="pill bdg-${x.ctx.toLowerCase()}">${x.ctx}</span>${x.inv.diPct>0?`<span class="pill">${x.inv.diPct}% do DI</span>`:''}${x.inv.banco?`<span class="pill">${esc(x.inv.banco)}</span>`:''}</div>${x.inv.id===''?`<p class="small muted" style="margin:6px 0 0">Lançamentos de investimento sem um investimento específico escolhido. <button class="link small" data-act="naminv" data-c="${x.ctx}">Dar nome e organizar</button></p>`:''}</div>
     <div style="text-align:right"><b style="font:600 19px 'Poppins',sans-serif">${brl(c.fin)}</b><div class="small muted">valor final</div></div></div>
     ${(()=>{const pu=invPurchases(x.ctx,x.inv);if(!pu.list.length)return'';const multi=pu.list.length>1;
-      return `<div class="small muted" style="margin-top:8px">${pu.totalQtd.toLocaleString('pt-BR',{maximumFractionDigits:4})} un.${pu.avgPreco!==null?` · ${multi?'preço médio ':''}${brl(pu.avgPreco)}/un.`:''}</div>
+      return `<div class="small muted" style="margin-top:8px">${pu.qtdPos.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. em carteira${pu.qtdVendida>0?` (${pu.totalQtd.toLocaleString('pt-BR',{maximumFractionDigits:4})} compradas − ${pu.qtdVendida.toLocaleString('pt-BR',{maximumFractionDigits:4})} vendidas)`:''}${pu.avgPreco!==null?` · ${multi?'preço médio de compra ':'preço de compra '}${brl(pu.avgPreco)}/un.`:''}</div>
       ${multi?`<details class="term" style="margin-top:6px;border-bottom:0"><summary>Minhas compras (${pu.list.length})</summary>${pu.list.map(p=>`<div class="row between small" style="margin-top:8px"><span>${p.date?p.date.slice(8)+'/'+p.date.slice(5,7)+'/'+p.date.slice(0,4):'—'} · ${esc(p.origem)}</span><span>${p.qtd.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. × ${brl(p.preco)} = <b>${brl(p.qtd*p.preco)}</b></span></div>`).join('')}</details>`:''}`;
     })()}
     ${x.inv.venc?(()=>{const d=Math.round((new Date(x.inv.venc+'T12:00:00')-new Date(todayISO()+'T12:00:00'))/86400000);return `<div class="small" style="margin-top:4px"><span class="${d<0?'neg':(d<=30?'':'muted')}">Vencimento: ${x.inv.venc.slice(8)}/${x.inv.venc.slice(5,7)}/${x.inv.venc.slice(0,4)}${d<0?' · vencido':(d<=30?' · em '+d+' dia(s)':'')}</span></div>`})():''}
     ${(x.inv.goals&&x.inv.goals.length)?`<div class="small" style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap">${x.inv.goals.map(a=>{const g=S.goals.find(gg=>gg.id===a.id);return g?`<button class="link" data-act="editgoal" data-v="${g.id}">${svg('flag')} ${esc(g.n)} (${a.pct}%)</button>`:''}).join('')}</div>`:''}
-    <div class="grid2 small" style="margin-top:12px;gap:8px"><div class="muted">Saldo inicial<br><b style="color:var(--ink)">${brl(c.ini)}</b></div><div class="muted">Aportes<br><b style="color:var(--ink)">${brl(c.apo)}</b></div><div class="muted">Rendimento<br><b class="${c.rend<0?'neg':'pos'}">${brl(c.rend)}</b></div><div class="muted">Rentabilidade<br><b class="${pct!==null&&pct<0?'neg':'pos'}">${pct===null?'–':pct1(pct)}</b></div>${c.divid>0?`<div class="muted">Dividendos recebidos<br><b class="pos">${brl(c.divid)}</b><span class="small muted" style="display:block;font-weight:400">não entra no saldo final</span></div>`:''}${c.ganhoCap?`<div class="muted">Ganho de capital (vendas)<br><b class="${c.ganhoCap<0?'neg':'pos'}">${brl(c.ganhoCap)}</b></div>`:''}</div>
+    <div class="grid2 small" style="margin-top:12px;gap:8px"><div class="muted">Saldo inicial<br><b style="color:var(--ink)">${brl(c.ini)}</b></div><div class="muted">Aportes<br><b style="color:var(--ink)">${brl(c.apo)}</b></div><div class="muted">Rendimento<br><b class="${c.rend<0?'neg':'pos'}">${brl(c.rend)}</b></div><div class="muted">Rentabilidade<br><b class="${pct!==null&&pct<0?'neg':'pos'}">${pct===null?'–':pct1(pct)}</b></div>${c.divid>0?`<div class="muted">Dividendos recebidos<br><b class="pos">${brl(c.divid)}</b><span class="small muted" style="display:block;font-weight:400">não entra no saldo final</span></div>`:''}${c.ganhoCap?`<div class="muted">Ganho de capital (vendas)<br><b class="${c.ganhoCap<0?'neg':'pos'}">${brl(c.ganhoCap)}</b>${c.custoGanhoCap>0?` <span class="small ${c.ganhoCap<0?'neg':'pos'}">(${pct1(c.ganhoCap/c.custoGanhoCap*100)})</span>`:''}</div>`:''}</div>
     <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn small" data-act="invrec" data-v="${esc(key)}" data-k="saldo">Atualizar saldo</button><button class="btn ghost small" data-act="invrec" data-v="${esc(key)}" data-k="rend">Rendimento</button><button class="btn ghost small" data-act="invrec" data-v="${esc(key)}" data-k="div">Dividendos</button><button class="btn ghost small" data-act="invrec" data-v="${esc(key)}" data-k="resg">Resgate</button></div>
     ${hist.length?`<details class="term" style="margin-top:10px;border-bottom:0"><summary>Histórico (${hist.length})</summary>${hist.slice(0,25).map(r=>`<div class="row between small" style="margin-top:8px"><span>${r.d.slice(8)}/${r.d.slice(5,7)}/${r.d.slice(0,4)} · ${r.l}</span><span class="row" style="gap:8px"><b class="${r.v<0?'neg':''}">${brl(r.v)}</b>${r.id?`<button class="small ${ui.del==='rec:'+r.id?'neg':'muted'}" style="text-decoration:underline;font-weight:600" data-act="delrec" data-v="${r.id}" data-c="${r.ctx}">${ui.del==='rec:'+r.id?'Confirmar':'Excluir'}</button>`:''}</span></div>`).join('')}</details>`:''}</div>`;
   });
@@ -2304,9 +2306,9 @@ function saveInvRec(){
   if(v<=0){err.textContent='O resgate deve ser maior que zero.';return}
   const rid=uid(),eid=Date.now(),cat=resgateCat(ctx),invObj=F.invs.find(i=>i.id===id)||{id,qtd:0,preco:0},nm=invFind(ctx,id).n;
   const qv=parseNum($('#ir_qv')?$('#ir_qv').value:'')||0,taxas=parseNum($('#ir_taxas')?$('#ir_taxas').value:'')||0;
-  let ganho;
-  if(qv>0){const pu=invPurchases(ctx,invObj);if(pu.avgPreco!==null)ganho=Math.round((v-taxas-qv*pu.avgPreco)*100)/100}
-  F.invRecs.push({id:rid,inv:id,date,tipo:'resg',valor:v,entryId:eid,qtdVend:qv>0?qv:undefined,taxas:taxas>0?taxas:undefined,ganho});
+  let ganho,custoVend;
+  if(qv>0){const pu=invPurchases(ctx,invObj);if(pu.avgPreco!==null){custoVend=Math.round(qv*pu.avgPreco*100)/100;ganho=Math.round((v-taxas-custoVend)*100)/100}}
+  F.invRecs.push({id:rid,inv:id,date,tipo:'resg',valor:v,entryId:eid,qtdVend:qv>0?qv:undefined,taxas:taxas>0?taxas:undefined,ganho,custoVend});
   F.entries.push({id:eid,date,cat,desc:'Resgate · '+nm,valor:v,fv:'Variável',pa:1,pt:1,qtd:1,fromRec:rid,pago:true});
   save();ui.sheet=null;render();toast(ganho!==undefined?'Resgate lançado · ganho de capital '+brl(ganho):'Resgate lançado como receita '+(ctx==='PJ'?'no Negócio (PJ)':'no Pessoal (PF)'));
 }
