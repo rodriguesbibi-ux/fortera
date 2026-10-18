@@ -2093,8 +2093,10 @@ function sheetHTML(){
     </div>
     ${(S.goals.filter(g=>g.ctx===ctx).length)?`<label class="f" style="margin-top:14px">Distribuir entre objetivos (opcional)</label><p class="small muted" style="margin:0 0 4px">Quanto % deste valor é para cada objetivo do planner.</p><div id="e_goals">${S.goals.filter(g=>g.ctx===ctx).map(g=>`<div class="row" style="gap:10px;margin:7px 0"><span class="grow small">${esc(g.n)}</span><input class="in" style="width:78px;text-align:right" inputmode="numeric" placeholder="0%" data-goalpct data-id="${g.id}" value="${gv(g.id)}"></div>`).join('')}</div><p class="small" id="e_goalsum" style="margin:6px 0 0"></p>`:`<p class="small muted" style="margin:8px 0 0"><button class="link" data-act="newgoal">Criar um objetivo no planner</button> para distribuir este aporte.</p>`}</div>
     <div id="e_fvwrap"><label class="f" for="e_fv">Despesa fixa ou variável?</label><select class="in" id="e_fv"><option ${(!ed||ed.fv!=='Fixo')?'selected':''}>Variável</option><option ${ed&&ed.fv==='Fixo'?'selected':''}>Fixo</option></select></div>
-    ${ed?'':`<div class="grid2"><div><label class="f" for="e_pa">Parcela atual</label><input class="in" id="e_pa" inputmode="numeric" placeholder="1"></div><div><label class="f" for="e_pt">Total de parcelas</label><input class="in" id="e_pt" inputmode="numeric" placeholder="1"></div></div>
-    <label class="row small" style="margin:12px 0 0;gap:10px"><input type="checkbox" id="e_gen" style="width:20px;height:20px"> Lançar automaticamente as parcelas seguintes, mês a mês</label>`}
+    ${ed?'':`<label class="row small" style="margin:12px 0 0;gap:10px"><input type="checkbox" id="e_rec" data-ch="erec" style="width:20px;height:20px"> Despesa recorrente (repete todo mês, sem data pra acabar — ex.: aluguel, escola)</label>
+    <div id="e_pawrap"><div class="grid2"><div><label class="f" for="e_pa">Parcela atual</label><input class="in" id="e_pa" inputmode="numeric" placeholder="1"></div><div><label class="f" for="e_pt">Total de parcelas</label><input class="in" id="e_pt" inputmode="numeric" placeholder="1"></div></div>
+    <label class="row small" style="margin:12px 0 0;gap:10px"><input type="checkbox" id="e_gen" style="width:20px;height:20px"> Lançar automaticamente as parcelas seguintes, mês a mês</label></div>
+    <p id="e_recnote" class="small muted" style="margin:8px 0 0" hidden>Lança este e os próximos 23 meses de uma vez (2 anos), com este valor e esta categoria. Se o valor mudar depois (reajuste de contrato, por exemplo), você edita um lançamento e escolhe se é só daquele mês em diante.</p>`}
     ${ed&&ed.recId?`<label class="f" for="e_scope">Esta é uma despesa recorrente. Aplicar alteração a:</label><select class="in" id="e_scope"><option value="one">Somente este lançamento</option><option value="forward">Este e os próximos lançamentos desta recorrência</option></select>`:''}
     <div id="e_err" class="neg small" style="min-height:20px;margin-top:8px"></div>
     <div class="row" style="gap:10px"><button class="btn sec" data-act="closesheet">Cancelar</button><div class="grow"><button class="btn block" data-act="saveentry">${ed?'Salvar alterações':'Salvar lançamento'}</button></div></div></div></div>`;
@@ -2392,6 +2394,15 @@ function saveEntry(){
     }
     ui.sheet=null;ui.editEntry=null;render();return;
   }
+  const isRec=$('#e_rec')&&$('#e_rec').checked;
+  if(isRec){
+    const recId=uid(),base=Date.now(),N=24,[y0,m0,d0]=date.split('-').map(Number);
+    for(let k=0;k<N;k++){
+      const d=new Date(y0,m0-1+k,d0,12,0,0),dt=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+      F.entries.push({id:base+k,date:dt,cat,desc,valor:val,fv:'Fixo',pa:1,pt:1,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:k===0?invQtd:undefined,invPreco:k===0?invPreco:undefined,goals:goals.length?goals:undefined,conta:conta||undefined,recId,pago:dt<=todayISO()});
+    }
+    save();ui.sheet=null;render();toast(`Lançamento recorrente criado (próximos ${N} meses)`);return;
+  }
   const base=Date.now();
   F.entries.push({id:base,date,cat,desc,valor:val,fv,pa,pt,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:invQtd||undefined,invPreco:invPreco||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:date<=todayISO()});
   if(gen){for(let k=1;k<=pt-pa;k++){const d2=addMonths(date,k);F.entries.push({id:base+k,date:d2,cat,desc,valor:val,fv,pa:pa+k,pt,prod:prod||undefined,qtd,inv:inv||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:d2<=todayISO()})}}
@@ -2415,6 +2426,7 @@ document.addEventListener('change',function(ev){
   if(t.dataset.ch==='period'){ui.period=t.value;render()}
   else if(t.dataset.ch==='lancconta'){ui.lancConta=t.value;render()}
   else if(t.id==='lc_group'){ui.groupCard=t.checked;render()}
+  else if(t.dataset.ch==='erec'){const w=$('#e_pawrap'),n=$('#e_recnote');if(w)w.hidden=t.checked;if(n)n.hidden=!t.checked}
   else if(t.dataset.ch==='gname'||t.dataset.ch==='cname'){const v=t.value.trim();const F=S.fin[ui.ctx];const o=t.dataset.ch==='gname'?F.cfg.groups.find(x=>x.id===t.dataset.id):F.cfg.cats.find(x=>x.id===t.dataset.id);if(o){if(v)o.n=v;else t.value=o.n;save()}}
   else if(t.dataset.ch==='gkind'){const g=S.fin[ui.ctx].cfg.groups.find(x=>x.id===t.dataset.id);if(g){g.kind=t.value;save()}}
   else if(t.dataset.ch==='ngt'){const w=$('#ng_kw');if(w)w.hidden=t.value==='R'}
