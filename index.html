@@ -1247,7 +1247,7 @@ function entryRow(ctx,e){
   const c=catOf(ctx,e.cat),isR=c.t==='R';
   const statusPill=`<span class="pill ${e.pago?'ok':'warn'}" style="margin-left:4px">${e.pago?(isR?'Recebido':'Pago'):'Em aberto'}</span>`;
   const statusAct=e.pago?`<button class="small muted" style="font-weight:600;text-decoration:underline" data-act="unmarkpaid" data-v="${e.id}">Marcar como em aberto</button>`:`<button class="small" style="font-weight:600;text-decoration:underline;color:var(--sage-d)" data-act="markpaid" data-v="${e.id}">Marcar como ${isR?'recebido':'pago'}</button>`;
-  return `<div class="entry"><div class="date">${e.date.slice(8)}/${e.date.slice(5,7)}</div><div class="grow"><div style="font-weight:500">${esc(e.desc||c.n)}${e.recId?' <span class=\'pill\' style=\'margin-left:4px\'>Recorrente</span>':''}${statusPill}</div><div class="small muted">${esc(c.n)}${e.prod?' · '+esc(prodName(e.prod)):''}${e.inv?' · '+esc(invName(ctx,e.inv)):''}${e.conta?' · '+esc(accName(ctx,e.conta)):''}${!isR?' · '+esc(e.fv||'Variável'):''}${e.pt>1?` · parcela ${e.pa}/${e.pt}`:''}</div></div><div style="text-align:right"><div class="${isR?'pos':''}" style="font-weight:600">${isR?'+':'−'} ${brl(e.valor)}</div><div class="row" style="gap:10px;justify-content:flex-end;margin-top:2px;flex-wrap:wrap">${(!e.fromRec&&!e.xferId)?statusAct:''}${(!e.fromRec&&!e.xferId)?`<button class="small muted" style="font-weight:600;text-decoration:underline" data-act="editentry" data-v="${e.id}">Editar</button>`:''}<button class="small ${ui.del===e.id?'neg':'muted'}" style="font-weight:600;text-decoration:underline" data-act="del" data-v="${e.id}">${ui.del===e.id?'Confirmar exclusão':'Excluir'}</button></div></div></div>`;
+  return `<div class="entry"><div class="date">${e.date.slice(8)}/${e.date.slice(5,7)}</div><div class="grow"><div style="font-weight:500">${esc(e.desc||c.n)}${e.recId?' <span class=\'pill\' style=\'margin-left:4px\'>Recorrente</span>':''}${statusPill}</div><div class="small muted">${esc(c.n)}${e.prod?' · '+esc(prodName(e.prod)):''}${e.inv?' · '+esc(invName(ctx,e.inv)):''}${e.conta?' · '+esc(accName(ctx,e.conta)):''}${!isR?' · '+esc(e.fv||'Variável'):''}${e.pt>1?` · parcela ${e.pa}/${e.pt}`:''}</div></div><div style="text-align:right"><div class="${isR?'pos':''}" style="font-weight:600">${isR?'+':'−'} ${brl(e.valor)}</div><div class="row" style="gap:10px;justify-content:flex-end;margin-top:2px;flex-wrap:wrap">${(!e.fromRec&&!e.xferId)?statusAct:''}${!e.xferId?`<button class="small muted" style="font-weight:600;text-decoration:underline" data-act="editentry" data-v="${e.id}">Editar</button>`:''}<button class="small ${ui.del===e.id?'neg':'muted'}" style="font-weight:600;text-decoration:underline" data-act="del" data-v="${e.id}">${ui.del===e.id?'Confirmar exclusão':'Excluir'}</button></div></div></div>`;
 }
 
 function mkBalanceAsOf(ctx,selAcc){
@@ -2077,6 +2077,16 @@ function sheetHTML(){
   const ctx=ui.ctx;
   if(ui.sheet==='entry'){
     const ed=ui.editEntry?S.fin[ctx].entries.find(e=>e.id===ui.editEntry):null;
+    if(ed&&ed.fromRec){
+      const c=catOf(ctx,ed.cat),isR=c.t==='R';
+      return `<div class="scrim" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true" aria-label="Editar data de recebimento" data-stop><h3>Editar data de recebimento</h3>
+      <p class="sub">Resgates de ações, FIIs e outros investimentos de renda variável costumam cair na conta alguns dias depois da solicitação. Aqui você ajusta só a data em que o dinheiro entrou (ou vai entrar) na conta — a data usada no histórico do investimento, no cálculo do ganho de capital e na quantidade em carteira não muda.</p>
+      <p class="small muted" style="margin:0 0 10px"><b>${esc(ed.desc||c.n)}</b> · ${isR?'+':'−'} ${brl(ed.valor)}</p>
+      <label class="f" for="e_date">Data em que caiu (ou vai cair) na conta</label><input class="in" id="e_date" type="date" value="${ed.date}">
+      ${allAccounts(ctx).length?`<label class="f" for="e_conta">Conta ou cartão (opcional)</label><select class="in" id="e_conta"><option value="">Não especificado</option>${allAccounts(ctx).map(a=>`<option value="${a.id}" ${ed.conta===a.id?'selected':''}>${esc(a.n)}${a.tipo==='cartao'?' (cartão)':''}</option>`).join('')}</select>`:''}
+      <div id="e_err" class="neg small" style="min-height:20px;margin-top:8px"></div>
+      <div class="row" style="gap:10px"><button class="btn sec" data-act="closesheet">Cancelar</button><div class="grow"><button class="btn block" data-act="saveentry">Salvar alterações</button></div></div></div></div>`;
+    }
     const gv=id=>{if(!ed||!ed.goals)return '';const a=ed.goals.find(x=>x.id===id);return a?a.pct:''};
     return `<div class="scrim" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true" aria-label="${ed?'Editar lançamento':'Novo lançamento'}" data-stop><h3>${ed?'Editar lançamento':`Novo lançamento ${ctx==='PJ'?'do negócio':'pessoal'}`}</h3>
     <label class="f" for="e_cat">Categoria</label><select class="in" id="e_cat" data-ch="ecat">${catOptions(ctx,ed?ed.cat:'')}</select>${ctx==='PJ'?`<div id="e_recwrap" hidden><label class="f" for="e_prod">Produto ou serviço vendido</label><select class="in" id="e_prod" data-ch="eprod"><option value="">Sem produto ou serviço</option>${(S.fin.PJ.products||[]).filter(p=>!p.arch).map(p=>`<option value="${p.id}" ${ed&&ed.prod===p.id?'selected':''}>${esc(p.n)} (${p.tipo==='Serviço'?'serviço':'produto'})</option>`).join('')}</select><label class="f" for="e_qtd">Quantidade</label><input class="in" id="e_qtd" data-ch="eqtd" inputmode="decimal" value="${ed&&ed.qtd?ed.qtd:1}"><p class="small" style="margin:6px 0 0"><button class="link" data-act="prods">Cadastrar produto ou serviço</button></p></div>`:''}
@@ -2359,6 +2369,15 @@ function saveGoal(){
 }
 function saveEntry(){
   const F=S.fin[ui.ctx],err=$('#e_err'),editing=!!ui.editEntry;
+  if(editing){
+    const exFR=F.entries.find(e=>e.id===ui.editEntry);
+    if(exFR&&exFR.fromRec){
+      const d2=$('#e_date').value,conta2=$('#e_conta')?$('#e_conta').value:'';
+      if(!d2){err.textContent='Informe a data.';return}
+      exFR.date=d2;exFR.conta=conta2||undefined;
+      save();ui.sheet=null;ui.editEntry=null;render();toast('Data de recebimento atualizada');return;
+    }
+  }
   const cat=$('#e_cat').value,val=parseNum($('#e_val').value),date=$('#e_date').value;
   if(!cat){err.textContent='Crie ao menos uma categoria antes de lançar.';return}
   if(!(val>0)){err.textContent='Informe um valor maior que zero.';return}
