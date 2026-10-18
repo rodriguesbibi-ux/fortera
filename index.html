@@ -1436,11 +1436,11 @@ function invCalc(ctx,inv,start,end){
     if(e.t==='open'){ini+=e.v;return}
     if(e.t==='div'){if(e.d>=start)dp+=e.v;return}
     if(e.t==='resg'&&e.ganho!=null&&e.d>=start){cg+=e.ganho;ccg+=(e.custoVend!=null?e.custoVend:(e.v-(e.taxas||0)-e.ganho))}
-    const eff=e.t==='apo'?e.v:(e.t==='resg'?-e.v:(e.t==='rend'?e.v:e.y));
+    const eff=e.t==='apo'?e.v:(e.t==='resg'?-(e.ganho!=null?(e.v-e.ganho):e.v):(e.t==='rend'?e.v:e.y));
     if(e.d<start){ini+=eff;return}
     if(e.t==='apo')ap+=e.v;else if(e.t==='resg')gp+=e.v;else rp+=(e.t==='rend'?e.v:e.y);
   });
-  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,fin:ini+ap+rp-gp,base:ini+ap};
+  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,fin:ini+ap+rp-gp+cg,base:ini+ap};
 }
 function resgateCat(ctx){
   const F=S.fin[ctx];let c=F.cfg.cats.find(x=>x.sys==='resgate');
@@ -1569,7 +1569,7 @@ function viewInv(){
   h+=`<h2 class="h-card" style="margin:18px 2px 0">Investimentos</h2>`;
   items.forEach(x=>{
     const c=invCalc(x.ctx,x.inv,'0000-00-00',todayISO()),pct=c.base>0?c.rend/c.base*100:null,key=x.ctx+'|'+x.inv.id;
-    const puHead=invPurchases(x.ctx,x.inv),finShow=(puHead.totalQtd>0&&puHead.qtdPos<=0)?Math.max(0,c.fin):c.fin;
+    const puHead=invPurchases(x.ctx,x.inv),finShow=Math.abs(c.fin)<0.005?0:c.fin;
     const hist=[];
     invRun(x.ctx,x.inv).evs.forEach(e=>{if(e.t==='open')return;if(e.t==='apo'){if(e.d<=todayISO())hist.push({d:e.d,l:'Aporte',v:e.v});return}
       if(e.t==='resg')hist.push({d:e.d,l:'Resgate (virou receita)'+(e.ganho!=null?' · ganho de capital '+brl(e.ganho):''),v:-e.v,id:e.id,ctx:x.ctx});
