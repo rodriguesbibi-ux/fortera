@@ -1473,8 +1473,8 @@ function invCalc(ctx,inv,start,end){
     if(e.d<start){ini+=eff;return}
     if(e.t==='apo')ap+=e.v;else if(e.t==='resg')gp+=e.v;else rp+=(e.t==='rend'?e.v:e.y);
   });
-  const rendReal=dp+(isRF?rp:0),rendNRel=isRF?0:rp;
-  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,rendReal,rendNRel,fin:ini+ap+rp-gp+cg,base:ini+ap};
+  const rendRF=isRF?rp:0,rendNRel=isRF?0:rp;
+  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,rendRF,rendNRel,fin:ini+ap+rp-gp+cg,base:ini+ap};
 }
 function resgateCat(ctx){
   const F=S.fin[ctx];let c=F.cfg.cats.find(x=>x.sys==='resgate');
@@ -1534,9 +1534,9 @@ function invPreview(){
   }else p.innerHTML='O valor informado soma ao saldo do investimento como rendimento.';
 }
 function invAgg(items,start,end){
-  const a={ini:0,apo:0,rend:0,resg:0,fin:0,divid:0,ganhoCap:0,custoGanhoCap:0,rendReal:0,rendNRel:0};
+  const a={ini:0,apo:0,rend:0,resg:0,fin:0,divid:0,ganhoCap:0,custoGanhoCap:0,rendRF:0,rendNRel:0};
   items.forEach(x=>{const c=invCalc(x.ctx,x.inv,start,end);x.c=c;for(const k in a)a[k]+=c[k]});
-  a.base=a.ini+a.apo;a.pct=a.base>0?(a.rendReal+a.rendNRel)/a.base*100:null;return a;
+  a.base=a.ini+a.apo;a.rendTot=a.rendRF+a.divid+a.ganhoCap;a.pct=a.base>0?(a.rendRF+a.divid+a.rendNRel)/a.base*100:null;return a;
 }
 function lineSvg(vals,lastLabel){
   const last=vals.length-1;if(last<0)return '';
@@ -1586,10 +1586,12 @@ function viewInv(){
    ${kpi('Saldo inicial',brl(ag.ini),'no começo do período','var(--ink2)')}
    ${kpi('Aportes',brl(ag.apo),'novos valores investidos','var(--sage-d)')}
    ${kpi('Resgates',brl(ag.resg),'saídas por venda/resgate','var(--terra-m)')}
-   ${kpi('Rendimento realizado',`<span class="${ag.rendReal<0?'neg':'pos'}">${brl(ag.rendReal)}</span>`,'dividendos e juros de renda fixa','var(--pri)')}
+   ${kpi('Rendimento renda fixa',`<span class="${ag.rendRF<0?'neg':'pos'}">${brl(ag.rendRF)}</span>`,'juros de poupança, CDB, tesouro etc.','var(--pri)')}
+   ${kpi('Dividendos',`<span class="${ag.divid<0?'neg':'pos'}">${brl(ag.divid)}</span>`,'renda de FIIs, ações e demais variáveis','var(--pri)')}
    ${kpi('Valorização não realizada',`<span class="${ag.rendNRel<0?'neg':'pos'}">${brl(ag.rendNRel)}</span>`,'variação de preço da renda variável','var(--pri)')}
-   ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento (realizado + não realizado) ÷ (saldo inicial + aportes)','var(--terra-m)')}
-   ${ag.ganhoCap?kpi('Ganho de capital',`<span class="${ag.ganhoCap<0?'neg':'pos'}">${brl(ag.ganhoCap)}</span>`,ag.custoGanhoCap>0?`<span class="${ag.ganhoCap<0?'neg':'pos'}">${pct1(ag.ganhoCap/ag.custoGanhoCap*100)}</span> sobre o custo vendido`:'em vendas no período','var(--sage-d)'):''}</div>`;
+   ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento (RF + dividendos + não realizado) ÷ (saldo inicial + aportes)','var(--terra-m)')}
+   ${ag.ganhoCap?kpi('Ganho de capital',`<span class="${ag.ganhoCap<0?'neg':'pos'}">${brl(ag.ganhoCap)}</span>`,ag.custoGanhoCap>0?`<span class="${ag.ganhoCap<0?'neg':'pos'}">${pct1(ag.ganhoCap/ag.custoGanhoCap*100)}</span> sobre o custo vendido`:'em vendas no período','var(--sage-d)'):''}
+   ${kpi('Rendimento total',`<span class="${ag.rendTot<0?'neg':'pos'}">${brl(ag.rendTot)}</span>`,'renda fixa + dividendos + ganho de capital','var(--sage-d)')}</div>`;
   // composição por tipo
   const byT={};items.forEach(x=>{byT[x.inv.tipo]=(byT[x.inv.tipo]||0)+x.c.fin});
   const comp=Object.keys(byT).map(k=>[k,byT[k]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
