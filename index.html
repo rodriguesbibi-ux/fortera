@@ -1412,7 +1412,7 @@ function einvSync(){
   const di=$('#e_idi'),ve=$('#e_ivenc'),note=$('#e_iqtdnote');
   if(di)di.value=inv&&inv.diPct>0?String(inv.diPct).replace('.',','):'';
   if(ve)ve.value=inv&&inv.venc?inv.venc:'';
-  if(note)note.textContent=(inv&&inv.qtd>0)?`Este investimento já tem ${inv.qtd.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. registradas. O que você informar aqui soma a essa quantidade.`:'';
+  if(note){const qp=inv?invPurchases(ui.ctx,inv).qtdPos:0;note.textContent=qp>0?`Este investimento já tem ${qp.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. em carteira. O que você informar aqui soma a essa quantidade.`:''}
 }
 function goalPctSum(){const els=document.querySelectorAll('[data-goalpct]');let s=0;els.forEach(el=>{const n=parseNum(el.value);if(n>0)s+=n});const el=$('#e_goalsum');if(el){el.textContent=s>100?`Soma ${s}% — não pode passar de 100%`:(s>0?`${s}% distribuído`:'');el.className='small '+(s>100?'neg':'muted')}}
 function entryAuto(){const pid=$('#e_prod')?$('#e_prod').value:'';const p=(S.fin.PJ.products||[]).find(x=>x.id===pid);const v=$('#e_val');if(!p||!(p.preco>0)||!v)return;if(v.value===''||v.dataset.auto==='1'){const q=parseNum($('#e_qtd').value);const n=p.preco*(q>0?q:1);v.value=String(Math.round(n*100)/100).replace('.',',');v.dataset.auto='1'}}
@@ -1497,15 +1497,16 @@ function invPreview(){
   const resgWrap=$('#ir_resgwrap');if(resgWrap)resgWrap.hidden=(tipo!=='resg');
   const puWrap=$('#ir_puwrap'),puCalc=$('#ir_pucalc'),puInput=$('#ir_pu');
   if(puWrap){
-    const hasQtd=tipo==='saldo'&&inv&&inv.qtd>0;
+    const qtdPos=inv?invPurchases(ctx,inv).qtdPos:0;
+    const hasQtd=tipo==='saldo'&&inv&&qtdPos>0;
     puWrap.hidden=!hasQtd;
     if(hasQtd){
       const pu=parseNum(puInput.value);
       if(!isNaN(pu)&&pu>0){
-        const calc=inv.qtd*pu;
+        const calc=qtdPos*pu;
         $('#ir_val').value=String(Math.round(calc*100)/100).replace('.',',');
-        if(puCalc){puCalc.textContent=`${inv.qtd.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. × ${brl(pu)} = ${brl(calc)}`;puCalc.className='small';}
-      }else if(puCalc){puCalc.textContent=`Você tem ${inv.qtd.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. cadastradas. Informe o preço atual para o app calcular o saldo, ou preencha o saldo diretamente abaixo.`;puCalc.className='small muted';}
+        if(puCalc){puCalc.textContent=`${qtdPos.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. × ${brl(pu)} = ${brl(calc)}`;puCalc.className='small';}
+      }else if(puCalc){puCalc.textContent=`Você tem ${qtdPos.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. em carteira. Informe o preço atual para o app calcular o saldo, ou preencha o saldo diretamente abaixo.`;puCalc.className='small muted';}
     }
   }
   const v=parseNum($('#ir_val').value),d=$('#ir_date').value;
