@@ -1586,9 +1586,9 @@ function viewInv(){
    ${kpi('Saldo inicial',brl(ag.ini),'no começo do período','var(--ink2)')}
    ${kpi('Aportes',brl(ag.apo),'novos valores investidos','var(--sage-d)')}
    ${kpi('Resgates',brl(ag.resg),'saídas por venda/resgate','var(--terra-m)')}
-   ${kpi('Rendimento renda fixa',`<span class="${ag.rendRF<0?'neg':'pos'}">${brl(ag.rendRF)}</span>`,'juros de poupança, CDB, tesouro etc.','var(--pri)')}
-   ${kpi('Dividendos',`<span class="${ag.divid<0?'neg':'pos'}">${brl(ag.divid)}</span>`,'renda de FIIs, ações e demais variáveis','var(--pri)')}
-   ${kpi('Valorização não realizada',`<span class="${ag.rendNRel<0?'neg':'pos'}">${brl(ag.rendNRel)}</span>`,'variação de preço da renda variável','var(--pri)')}
+   ${items.some(x=>RF_TIPOS.includes(x.inv.tipo))?kpi('Rendimento renda fixa',`<span class="${ag.rendRF<0?'neg':'pos'}">${brl(ag.rendRF)}</span>`,'juros de poupança, CDB, tesouro etc.','var(--pri)'):''}
+   ${items.some(x=>!RF_TIPOS.includes(x.inv.tipo))?kpi('Dividendos',`<span class="${ag.divid<0?'neg':'pos'}">${brl(ag.divid)}</span>`,'renda de FIIs, ações e demais variáveis','var(--pri)'):''}
+   ${items.some(x=>!RF_TIPOS.includes(x.inv.tipo))?kpi('Valorização não realizada',`<span class="${ag.rendNRel<0?'neg':'pos'}">${brl(ag.rendNRel)}</span>`,'variação de preço da renda variável','var(--pri)'):''}
    ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento (RF + dividendos + não realizado) ÷ (saldo inicial + aportes)','var(--terra-m)')}
    ${ag.ganhoCap?kpi('Ganho de capital',`<span class="${ag.ganhoCap<0?'neg':'pos'}">${brl(ag.ganhoCap)}</span>`,ag.custoGanhoCap>0?`<span class="${ag.ganhoCap<0?'neg':'pos'}">${pct1(ag.ganhoCap/ag.custoGanhoCap*100)}</span> sobre o custo vendido`:'em vendas no período','var(--sage-d)'):''}
    ${kpi('Rendimento total',`<span class="${ag.rendTot<0?'neg':'pos'}">${brl(ag.rendTot)}</span>`,'renda fixa + dividendos + ganho de capital','var(--sage-d)')}</div>`;
