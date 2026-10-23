@@ -1474,7 +1474,7 @@ function invCalc(ctx,inv,start,end){
     if(e.t==='apo')ap+=e.v;else if(e.t==='resg')gp+=e.v;else rp+=(e.t==='rend'?e.v:e.y);
   });
   const rendRF=isRF?rp:0,rendNRel=isRF?0:rp;
-  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,rendRF,rendNRel,fin:ini+ap+rp-gp+cg,base:ini+ap};
+  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,rendRF,rendNRel,fin:ini+ap+rp-gp,base:ini+ap};
 }
 function resgateCat(ctx){
   const F=S.fin[ctx];let c=F.cfg.cats.find(x=>x.sys==='resgate');
