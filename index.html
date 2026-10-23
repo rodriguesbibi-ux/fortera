@@ -1021,10 +1021,13 @@ function viewCardInv(){
   let h=`<div class="rd-top"><button class="iconbtn" data-act="closepage" aria-label="Voltar">${svg('back')}</button><div class="grow" style="font-weight:600">Cartões de crédito</div></div><div style="padding:8px 18px 60px">`;
   h+=`<div class="chips" style="margin:6px 0 10px;flex-wrap:nowrap;overflow-x:auto">${cards.map(c=>`<button class="chip" data-act="selcard" data-v="${c.id}" data-c="${c.ctx}" aria-pressed="${c.id===cur.id&&c.ctx===cur.ctx}">${esc(c.n)}</button>`).join('')}</div>`;
   h+=`<div class="row between" style="align-items:center;margin:4px 0 10px"><button class="iconbtn" data-act="cardnav" data-v="-1" aria-label="Fatura anterior">${svg('back')}</button><b style="font-size:16px">${monthLbl}</b><button class="iconbtn" data-act="cardnav" data-v="1" aria-label="Próxima fatura">${svg('chev')}</button></div>`;
+  const allPaid=inv.items.length>0&&inv.items.every(e=>e.pago);
   h+=`<div class="card"><div class="row between" style="align-items:flex-start"><div><b style="font-size:17px">${esc(cur.n)}</b><div class="small muted">${esc(cur.bandeira||'')}${cur.banco?' · '+esc(cur.banco):''}</div></div><span class="pill ${inv.status==='Fechada'?'ok':'warn'}">${inv.status==='Fechada'?'Fatura fechada':'Fatura aberta'}</span></div>
   <div class="grid2 small" style="margin-top:14px;gap:10px"><div class="muted">Fechamento<br><b style="color:var(--ink)">${inv.close.slice(8)}/${inv.close.slice(5,7)}</b></div><div class="muted">Vencimento<br><b style="color:var(--ink)">${inv.due.slice(8)}/${inv.due.slice(5,7)}</b></div></div>
-  <div style="margin-top:14px"><span class="small muted">Valor da fatura</span><div style="font:600 26px 'Poppins',sans-serif" class="${inv.total<0?'neg':''}">${brl(inv.total)}</div></div></div>`;
-  h+=`<h2 class="h-card" style="margin:18px 2px 0">Lançamentos da fatura</h2>`;
+  <div style="margin-top:14px"><span class="small muted">Valor da fatura</span><div style="font:600 26px 'Poppins',sans-serif" class="${inv.total<0?'neg':''}">${brl(inv.total)}</div></div>
+  ${inv.items.length?(allPaid?`<div class="row between" style="margin-top:14px;align-items:center"><span class="pill ok">Fatura paga</span><button class="link small" data-act="despagarfatura">Marcar como em aberto</button></div>`:`<button class="btn block" style="margin-top:14px" data-act="pagarfatura">${ui.confirm==='pagarfat'?'Confirmar: marcar '+brl(inv.total)+' como pago':'Pagar fatura'}</button>`):''}
+  </div>`;
+  h+=`<div class="row between" style="align-items:center;margin:18px 2px 0"><h2 class="h-card" style="margin:0">Lançamentos da fatura</h2><button class="btn small" data-act="newcardentry">${svg('plus')} Novo</button></div>`;
   h+=inv.items.length?`<div class="card">${inv.items.map(e=>entryRow(cur.ctx,e)).join('')}</div>`:`<div class="empty">Nenhum lançamento nesta fatura.</div>`;
   h+=`</div>`;
   return h;
@@ -2181,7 +2184,7 @@ function sheetHTML(){
     <label class="f" for="e_cat">Categoria</label><select class="in" id="e_cat" data-ch="ecat">${catOptions(ctx,ed?ed.cat:'')}</select>${ctx==='PJ'?`<div id="e_recwrap" hidden><label class="f" for="e_prod">Produto ou serviço vendido</label><select class="in" id="e_prod" data-ch="eprod"><option value="">Sem produto ou serviço</option>${(S.fin.PJ.products||[]).filter(p=>!p.arch).map(p=>`<option value="${p.id}" ${ed&&ed.prod===p.id?'selected':''}>${esc(p.n)} (${p.tipo==='Serviço'?'serviço':'produto'})</option>`).join('')}</select><label class="f" for="e_qtd">Quantidade</label><input class="in" id="e_qtd" data-ch="eqtd" inputmode="decimal" value="${ed&&ed.qtd?ed.qtd:1}"><p class="small" style="margin:6px 0 0"><button class="link" data-act="prods">Cadastrar produto ou serviço</button></p></div>`:''}
     <div class="grid2"><div><label class="f" for="e_val">Valor (R$)</label><input class="in" id="e_val" data-eval inputmode="decimal" placeholder="0,00" value="${ed?String(ed.valor).replace('.',','):''}" ${ed?'data-auto="1"':''}></div><div><label class="f" for="e_date">Data</label><input class="in" id="e_date" type="date" value="${ed?ed.date:todayISO()}"></div></div>
     <label class="f" for="e_desc">Descrição</label><input class="in" id="e_desc" placeholder="Ex.: Cliente Maria, compra de material" value="${esc(ed?ed.desc||'':'')}">
-    ${allAccounts(ctx).length?`<label class="f" for="e_conta">Conta ou cartão (opcional)</label><select class="in" id="e_conta"><option value="">Não especificado</option>${allAccounts(ctx).map(a=>`<option value="${a.id}" ${ed&&ed.conta===a.id?'selected':''}>${esc(a.n)}${a.tipo==='cartao'?' (cartão)':''}</option>`).join('')}</select>`:`<p class="small muted" style="margin:8px 0 0"><button class="link" data-act="contas">Cadastrar conta ou cartão</button> para marcar onde este lançamento aconteceu.</p>`}
+    ${allAccounts(ctx).length?`<label class="f" for="e_conta">Conta ou cartão (opcional)</label><select class="in" id="e_conta"><option value="">Não especificado</option>${allAccounts(ctx).map(a=>`<option value="${a.id}" ${(ed?ed.conta===a.id:(!ed&&ui.prefillConta===a.id))?'selected':''}>${esc(a.n)}${a.tipo==='cartao'?' (cartão)':''}</option>`).join('')}</select>`:`<p class="small muted" style="margin:8px 0 0"><button class="link" data-act="contas">Cadastrar conta ou cartão</button> para marcar onde este lançamento aconteceu.</p>`}
     <div id="e_invwrap" hidden><label class="f" for="e_inv">Investimento que recebeu o aporte</label><select class="in" id="e_inv" data-ch="einv"><option value="">Não especificado</option>${(S.fin[ctx].invs||[]).filter(i=>!i.arch).map(i=>`<option value="${i.id}" ${ed&&ed.inv===i.id?'selected':''}>${esc(i.n)} (${esc(i.tipo)})</option>`).join('')}</select><p class="small muted" style="margin:6px 0 0">Este valor entra automaticamente no controle de investimentos. <button class="link" data-act="invs">Cadastrar investimento</button></p>
     <div id="e_invdetail">
     <label class="f" style="margin-top:12px">Detalhes desta compra (opcional)</label>
@@ -2306,7 +2309,7 @@ function setTab(t){ttsStop();ui.reader=null;ui.page=null;ui.tab=t;ui.del=null;
 document.addEventListener('click',function(ev){
   const el=ev.target.closest('[data-act]');if(!el)return;
   const act=el.dataset.act,v=el.dataset.v;
-  if(act==='closesheet'){if(ev.target.closest('[data-stop]')&&!ev.target.closest('button[data-act="closesheet"]'))return;ui.sheet=null;ui.editEntry=null;ui.markEntry=null;render();return}
+  if(act==='closesheet'){if(ev.target.closest('[data-stop]')&&!ev.target.closest('button[data-act="closesheet"]'))return;ui.sheet=null;ui.editEntry=null;ui.markEntry=null;ui.prefillConta=null;render();return}
   if(el.closest('[data-stop]')&&act!=='saveentry'&&act!=='savebudget'&&act!=='savecaixa'&&act!=='closesheet'){}
   switch(act){
    case 'tab':setTab(v);break;
@@ -2382,9 +2385,19 @@ document.addEventListener('click',function(ev){
    case 'deltipo':{if(ui.del!=='tipo:'+v){ui.del='tipo:'+v;render();break}S.invTipos=S.invTipos.filter(t=>t!==v);ui.del=null;save();render();break}
    case 'usecalcval':{const i=S.fin[el.dataset.c].invs.find(x=>x.id===v);if(i&&i.qtd>0&&i.preco>0){i.saldoIni=Math.round(i.qtd*i.preco*100)/100;if(!i.dataIni)i.dataIni=todayISO();save();render();toast('Saldo inicial atualizado')}break}
    case 'toggleinv':ui.invOpen=ui.invOpen||{};ui.invOpen[v]=!ui.invOpen[v];render();break;
-   case 'opencardinv':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;ui.page='cardinv';render(true);break}
-   case 'selcard':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;render();break}
-   case 'cardnav':{ui.cardOffset=(ui.cardOffset||0)+(+v);render();break}
+   case 'opencardinv':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;ui.confirm=null;ui.page='cardinv';render(true);break}
+   case 'selcard':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;ui.confirm=null;render();break}
+   case 'cardnav':{ui.cardOffset=(ui.cardOffset||0)+(+v);ui.confirm=null;render();break}
+   case 'newcardentry':{ui.ctx=ui.cardCtx;ui.prefillConta=ui.cardId;ui.editEntry=null;ui.sheet='entry';render();break}
+   case 'pagarfatura':{
+     if(ui.confirm!=='pagarfat'){ui.confirm='pagarfat';render();break}
+     const card=allCardsFlat().find(c=>c.ctx===ui.cardCtx&&c.id===ui.cardId);
+     if(card){const inv=cardInvoiceAt(card.ctx,card,ui.cardOffset||0),F=S.fin[card.ctx];inv.items.forEach(it=>{const ent=F.entries.find(x=>x.id===it.id);if(ent)ent.pago=true});save()}
+     ui.confirm=null;render();toast('Fatura marcada como paga');break}
+   case 'despagarfatura':{
+     const card=allCardsFlat().find(c=>c.ctx===ui.cardCtx&&c.id===ui.cardId);
+     if(card){const inv=cardInvoiceAt(card.ctx,card,ui.cardOffset||0),F=S.fin[card.ctx];inv.items.forEach(it=>{const ent=F.entries.find(x=>x.id===it.id);if(ent)ent.pago=false});save()}
+     render();toast('Fatura marcada como em aberto');break}
    case 'togglezeroinv':ui.invZeroOpen=!ui.invZeroOpen;render();break;
    case 'naminv':ui.naminvCtx=el.dataset.c==='PJ'?'PJ':'PF';ui.sheet='naminv';render();break;
    case 'savenaminv':{const n=$('#nm_n').value.trim();if(!n){toast('Digite o nome do investimento');break}const c=el.dataset.c==='PJ'?'PJ':'PF';const F=S.fin[c],res={};allCats(c).forEach(cc=>{if(cc.kind==='res')res[cc.id]=1});const i={id:uid(),n,tipo:$('#nm_t').value};F.invs.push(i);F.entries.forEach(e=>{if(!e.inv&&res[e.cat])e.inv=i.id});F.invRecs.forEach(r=>{if(!r.inv)r.inv=i.id});save();ui.sheet=null;ui.naminvCtx=null;render();toast('Investimento nomeado e organizado');break}
@@ -2515,12 +2528,12 @@ function saveEntry(){
       const d=new Date(y0,m0-1+k,d0,12,0,0),dt=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
       F.entries.push({id:base+k,date:dt,cat,desc,valor:val,fv:'Fixo',pa:1,pt:1,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:k===0?invQtd:undefined,invPreco:k===0?invPreco:undefined,goals:goals.length?goals:undefined,conta:conta||undefined,recId,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date:dt})<=todayISO()});
     }
-    save();ui.sheet=null;render();toast(`Lançamento recorrente criado (próximos ${N} meses)`);return;
+    save();ui.sheet=null;ui.prefillConta=null;render();toast(`Lançamento recorrente criado (próximos ${N} meses)`);return;
   }
   const base=Date.now();
   F.entries.push({id:base,date,cat,desc,valor:val,fv,pa,pt,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:invQtd||undefined,invPreco:invPreco||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date})<=todayISO()});
   if(gen){for(let k=1;k<=pt-pa;k++){const d2=addMonths(date,k);F.entries.push({id:base+k,date:d2,cat,desc,valor:val,fv,pa:pa+k,pt,prod:prod||undefined,qtd,inv:inv||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date:d2})<=todayISO()})}}
-  save();ui.sheet=null;render();toast(gen?`Lançamento e ${pt-pa} parcela(s) salvos`:'Lançamento salvo');
+  save();ui.sheet=null;ui.prefillConta=null;render();toast(gen?`Lançamento e ${pt-pa} parcela(s) salvos`:'Lançamento salvo');
 }
 document.addEventListener('input',function(ev){
   const t=ev.target;
