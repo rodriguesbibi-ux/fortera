@@ -1363,7 +1363,12 @@ function viewLanc(ctx,sm){
   if(accs.length){
     h+=`<label class="f" for="lc_sel" style="margin-top:0">Conta ou cartão</label><select class="in" id="lc_sel" data-ch="lancconta"><option value="">Todas as contas e cartões</option>${accs.map(a=>`<option value="${a.id}" ${ui.lancConta===a.id?'selected':''}>${esc(a.n)}${a.tipo==='cartao'?' (cartão)':''}</option>`).join('')}</select>`;
     const selAcc=accs.find(a=>a.id===ui.lancConta);
-    if(selAcc){const bal=accCalc(ctx,selAcc);h+=`<div class="card" style="margin:12px 0 0"><div class="row between" style="align-items:center"><span class="small muted">${selAcc.tipo==='cartao'?'Movimentado no cartão (total)':'Saldo atual da conta'}</span><b style="font:600 18px 'Poppins',sans-serif" class="${bal<0?'neg':''}">${brl(bal)}</b></div></div>`}
+    if(selAcc){
+      const isCardSel=selAcc.tipo==='cartao';
+      const bal=isCardSel?sm.pe.filter(e=>e.conta===selAcc.id).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0):accCalc(ctx,selAcc);
+      const lbl=isCardSel?(ui.period==='all'?'Movimentado no cartão (total)':'Movimentado no cartão (mês selecionado)'):'Saldo atual da conta';
+      h+=`<div class="card" style="margin:12px 0 0"><div class="row between" style="align-items:center"><span class="small muted">${lbl}</span><b style="font:600 18px 'Poppins',sans-serif" class="${bal<0?'neg':''}">${brl(bal)}</b></div></div>`;
+    }
   }
   const list=sm.pe.filter(e=>!ui.lancConta||e.conta===ui.lancConta).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
   const cards=(S.fin[ctx].accounts||[]).filter(a=>a.tipo==='cartao');
