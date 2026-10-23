@@ -1326,6 +1326,11 @@ function entryRow(ctx,e){
   return `<div class="entry"><div class="erow"><div class="date">${e.date.slice(8)}/${e.date.slice(5,7)}</div><div class="grow"><div class="etitle">${esc(e.desc||c.n)}${e.recId?' <span class=\'pill\' style=\'margin-left:4px\'>Recorrente</span>':''}${statusPill}</div><div class="esub">${esc(c.n)}${e.prod?' · '+esc(prodName(e.prod)):''}${e.inv?' · '+esc(invName(ctx,e.inv)):''}${e.conta?' · '+esc(accName(ctx,e.conta)):''}${!isR?' · '+esc(e.fv||'Variável'):''}${e.pt>1?` · parcela ${e.pa}/${e.pt}`:''}${dueHint}</div></div><div class="evalue ${isR?'pos':''}">${isR?'+':'−'} ${brl(e.valor)}</div></div><div class="eacts">${(!e.fromRec&&!e.xferId)?statusAct:''}${!e.xferId?`<button class="muted" data-act="editentry" data-v="${e.id}">Editar</button>`:''}<button class="${ui.del===e.id?'neg':'muted'}" data-act="del" data-v="${e.id}">${ui.del===e.id?'Confirmar exclusão':'Excluir'}</button></div></div>`;
 }
 
+function faturaRow(ctx,g){
+  const card=accFind(ctx,g.conta),isNeg=g.total<0;
+  const statusPill=`<span class="pill ${g.allPago?'ok':'warn'}" style="margin-left:4px">${g.allPago?'Paga':'Em aberto'}</span>`;
+  return `<div class="entry"><div class="erow"><div class="date">${g.date.slice(8)}/${g.date.slice(5,7)}</div><div class="grow"><div class="etitle">💳 Fatura ${esc(card?card.n:'Cartão')}${statusPill}</div><div class="esub">${g.count} lançamento(s) · vencimento</div></div><div class="evalue ${isNeg?'pos':''}">${isNeg?'+':'−'} ${brl(Math.abs(g.total))}</div></div><div class="eacts"><button class="muted" data-act="opencardinvdue" data-v="${g.date}" data-c="${ctx}" data-id="${g.conta}">Ver lançamentos da fatura</button></div></div>`;
+}
 function mkBalanceAsOf(ctx,selAcc){
   const F=S.fin[ctx];
   if(selAcc){
@@ -1345,7 +1350,7 @@ function dayGroupsHTML(ctx,items,balFn){
       const bal=balFn(curDate);
       h+=`<div class="row between" style="margin:16px 0 4px;align-items:baseline;border-top:1px solid var(--line);padding-top:8px"><span class="small muted" style="font-weight:600">${curDate.slice(8)}/${curDate.slice(5,7)}/${curDate.slice(0,4)}</span><span class="small" style="font-weight:600">Saldo do dia: <b class="${bal<0?'neg':''}">${brl(bal)}</b></span></div>`;
     }
-    h+=entryRow(ctx,e);
+    h+=e.isFatura?faturaRow(ctx,e):entryRow(ctx,e);
   });
   return h;
 }
@@ -1373,7 +1378,24 @@ function viewLanc(ctx,sm){
       h+=`<details class="term" open style="margin-bottom:6px"><summary><span class="grow"><b>💳 ${esc(g.card.n)}</b><span class="small muted" style="display:block;font-weight:400">${g.card.vencDia?`Vencimento todo dia ${g.card.vencDia}`:'Sem dia de vencimento cadastrado'} · ${g.items.length} lançamento(s)</span></span><b class="${total<0?'pos':''}">${brl(total)}</b></summary>${g.items.map(e=>entryRow(ctx,e)).join('')}</details>`;
     });
     if(rest.length){h+=`<p class="small muted" style="font-weight:600;margin:14px 0 4px">Outros lançamentos</p>`;rest.forEach(e=>h+=entryRow(ctx,e))}
-  }else h+=dayGroupsHTML(ctx,list,mkBalanceAsOf(ctx,accs.find(a=>a.id===ui.lancConta)));
+  }else{
+    let listShow=list;
+    if(!ui.lancConta&&cards.length){
+      const cardIds=new Set(cards.map(c=>c.id));
+      const nonCard=list.filter(e=>!cardIds.has(e.conta));
+      const F=S.fin[ctx],groups={};
+      F.entries.forEach(e=>{
+        if(!cardIds.has(e.conta))return;
+        const ed=entryEffDate(ctx,e);
+        if(ui.period!=='all'){const d=new Date(ed+'T12:00:00');if(d.getMonth()!==+ui.period||d.getFullYear()!==ui.year)return}
+        const key=e.conta+'|'+ed;
+        const g=groups[key]=groups[key]||{isFatura:true,id:'fat:'+key,date:ed,conta:e.conta,total:0,count:0,allPago:true};
+        g.total+=catOf(ctx,e.cat).t==='R'?-e.valor:e.valor;g.count++;if(!e.pago)g.allPago=false;
+      });
+      listShow=nonCard.concat(Object.values(groups)).sort((a,b)=>b.date.localeCompare(a.date));
+    }
+    h+=listShow.length?dayGroupsHTML(ctx,listShow,mkBalanceAsOf(ctx,accs.find(a=>a.id===ui.lancConta))):`<div class="empty">Nenhum lançamento neste período.</div>`;
+  }
   h+=`</div>`;
   return h;
 }
@@ -2386,6 +2408,10 @@ document.addEventListener('click',function(ev){
    case 'usecalcval':{const i=S.fin[el.dataset.c].invs.find(x=>x.id===v);if(i&&i.qtd>0&&i.preco>0){i.saldoIni=Math.round(i.qtd*i.preco*100)/100;if(!i.dataIni)i.dataIni=todayISO();save();render();toast('Saldo inicial atualizado')}break}
    case 'toggleinv':ui.invOpen=ui.invOpen||{};ui.invOpen[v]=!ui.invOpen[v];render();break;
    case 'opencardinv':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;ui.confirm=null;ui.page='cardinv';render(true);break}
+   case 'opencardinvdue':{
+     const card=allCardsFlat().find(c=>c.ctx===el.dataset.c&&c.id===el.dataset.id);
+     if(card){const cur0=cardInvoiceAt(card.ctx,card,0);ui.cardCtx=card.ctx;ui.cardId=card.id;ui.cardOffset=monthsBetween(cur0.due,v);ui.confirm=null;ui.page='cardinv';render(true)}
+     break}
    case 'selcard':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;ui.confirm=null;render();break}
    case 'cardnav':{ui.cardOffset=(ui.cardOffset||0)+(+v);ui.confirm=null;render();break}
    case 'newcardentry':{ui.ctx=ui.cardCtx;ui.prefillConta=ui.cardId;ui.editEntry=null;ui.sheet='entry';render();break}
