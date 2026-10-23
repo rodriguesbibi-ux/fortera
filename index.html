@@ -1600,6 +1600,14 @@ function invPreview(){
       }else if(puCalc){puCalc.textContent=`Você tem ${qtdPos.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. em carteira. Informe o preço atual para o app calcular o saldo, ou preencha o saldo diretamente abaixo.`;puCalc.className='small muted';}
     }
   }
+  if(tipo==='resg'){
+    const qv0=parseNum($('#ir_qv')?$('#ir_qv').value:''),pvu=parseNum($('#ir_pvu')?$('#ir_pvu').value:''),pvuCalc=$('#ir_pvucalc');
+    if(qv0>0&&!isNaN(pvu)&&pvu>0){
+      const tot=qv0*pvu;
+      $('#ir_val').value=String(Math.round(tot*100)/100).replace('.',',');
+      if(pvuCalc){pvuCalc.textContent=`${qv0.toLocaleString('pt-BR',{maximumFractionDigits:4})} un. × ${brl(pvu)} = ${brl(tot)}`;pvuCalc.className='small';}
+    }else if(pvuCalc)pvuCalc.textContent='';
+  }
   const v=parseNum($('#ir_val').value),d=$('#ir_date').value;
   if(tipo==='saldo'){
     if(isNaN(v)||!d){p.innerHTML='Informe o saldo que aparece no extrato. O app compara com o valor esperado (saldo anterior + aportes − resgates) e calcula o rendimento sozinho.';return}
@@ -2293,7 +2301,7 @@ function sheetHTML(){
     <label class="f" for="ir_tipo">O que você quer registrar?</label><select class="in" id="ir_tipo" data-irpv><option value="saldo" ${tp==='saldo'?'selected':''}>Saldo atual (o app calcula o rendimento)</option><option value="rend" ${tp==='rend'?'selected':''}>Rendimento (eu informo o valor rendido)</option><option value="div" ${tp==='div'?'selected':''}>Dividendos (recebidos em dinheiro)</option><option value="resg" ${tp==='resg'?'selected':''}>Resgate (retirada de dinheiro)</option></select>
     <div id="ir_puwrap" hidden><label class="f" for="ir_pu">Preço atual por unidade (R$)</label><input class="in" id="ir_pu" data-irpv inputmode="decimal" placeholder="Ex.: 32,50"><p class="small muted" id="ir_pucalc" style="margin:6px 0 0"></p></div>
     <div class="grid2"><div><label class="f" id="ir_vlbl" for="ir_val">Saldo atual (R$)</label><input class="in" id="ir_val" data-irpv inputmode="decimal" placeholder="0,00"></div><div><label class="f" for="ir_date">Data</label><input class="in" id="ir_date" data-irpv type="date" value="${todayISO()}"></div></div>
-    <div id="ir_resgwrap" hidden><div class="grid2"><div><label class="f" for="ir_qv">Quantidade vendida (opcional)</label><input class="in" id="ir_qv" data-irpv inputmode="decimal" placeholder="un."></div><div><label class="f" for="ir_taxas">Taxas (R$, opcional)</label><input class="in" id="ir_taxas" data-irpv inputmode="decimal" placeholder="0,00"></div></div><p class="small muted" style="margin:4px 0 0">Informando a quantidade vendida, o app calcula o ganho de capital (valor da venda menos taxas menos preço médio de compra × quantidade).</p></div>
+    <div id="ir_resgwrap" hidden><div class="grid2"><div><label class="f" for="ir_qv">Quantidade vendida (opcional)</label><input class="in" id="ir_qv" data-irpv inputmode="decimal" placeholder="un."></div><div><label class="f" for="ir_pvu">Preço de venda por unidade (R$, opcional)</label><input class="in" id="ir_pvu" data-irpv inputmode="decimal" placeholder="Ex.: 74,85"></div></div><p class="small muted" id="ir_pvucalc" style="margin:4px 0 0"></p><label class="f" for="ir_taxas">Taxas (R$, opcional)</label><input class="in" id="ir_taxas" data-irpv inputmode="decimal" placeholder="0,00"><p class="small muted" style="margin:6px 0 0">Informe quantidade e preço por unidade para o app calcular o valor total da venda sozinho (ou preencha o valor total diretamente acima). Com a quantidade vendida informada, o app também calcula o ganho de capital (valor da venda menos taxas menos preço médio de compra × quantidade).</p></div>
     <div id="ir_prev" class="modbanner" style="margin:12px 0 0;display:block;font-size:14px;--pri:var(--ink);--mod-soft:var(--surface2)"></div>
     <div id="ir_err" class="neg small" style="min-height:20px;margin-top:6px"></div>
     <div class="row" style="gap:10px"><button class="btn sec" data-act="closesheet">Cancelar</button><div class="grow"><button class="btn block" data-act="saveinvrec">Salvar</button></div></div></div></div>`;
