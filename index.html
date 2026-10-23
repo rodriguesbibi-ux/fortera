@@ -1553,18 +1553,19 @@ function invRun(ctx,inv,extra){
 }
 function invCalc(ctx,inv,start,end){
   const t=todayISO(),e2=end>t?t:end,run=invRun(ctx,inv),isRF=RF_TIPOS.includes(inv.tipo);
-  let ini=0,ap=0,rp=0,gp=0,dp=0,cg=0,ccg=0;
+  let ini=0,ap=0,rp=0,gp=0,finGp=0,dp=0,cg=0,ccg=0;
   run.evs.forEach(e=>{
     if(e.d>e2)return;
     if(e.t==='open'){ini+=e.v;return}
     if(e.t==='div'){if(e.d>=start)dp+=e.v;return}
-    if(e.t==='resg'&&e.ganho!=null&&e.d>=start){cg+=e.ganho;ccg+=(e.custoVend!=null?e.custoVend:(e.v-(e.taxas||0)-e.ganho))}
-    const eff=e.t==='apo'?e.v:(e.t==='resg'?-(e.ganho!=null?(e.v-e.ganho):e.v):(e.t==='rend'?e.v:e.y));
+    const custoVend=e.t==='resg'?(e.ganho!=null?(e.custoVend!=null?e.custoVend:(e.v-(e.taxas||0)-e.ganho)):e.v):0;
+    if(e.t==='resg'&&e.ganho!=null&&e.d>=start){cg+=e.ganho;ccg+=custoVend}
+    const eff=e.t==='apo'?e.v:(e.t==='resg'?-custoVend:(e.t==='rend'?e.v:e.y));
     if(e.d<start){ini+=eff;return}
-    if(e.t==='apo')ap+=e.v;else if(e.t==='resg')gp+=e.v;else rp+=(e.t==='rend'?e.v:e.y);
+    if(e.t==='apo')ap+=e.v;else if(e.t==='resg'){gp+=e.v;finGp+=custoVend;}else rp+=(e.t==='rend'?e.v:e.y);
   });
   const rendRF=isRF?rp:0,rendNRel=isRF?0:rp;
-  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,rendRF,rendNRel,fin:ini+ap+rp-gp,base:ini+ap};
+  return {ini,apo:ap,rend:rp,resg:gp,divid:dp,ganhoCap:cg,custoGanhoCap:ccg,rendRF,rendNRel,fin:ini+ap+rp-finGp,base:ini+ap};
 }
 function resgateCat(ctx){
   const F=S.fin[ctx];let c=F.cfg.cats.find(x=>x.sys==='resgate');
