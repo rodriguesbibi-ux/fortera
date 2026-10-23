@@ -947,25 +947,33 @@ function entryEffDate(ctx,e){
   if(!a||a.tipo!=='cartao'||!a.vencDia)return e.date;
   return cardDueFor(a,e.date);
 }
-function cardInvoice(ctx,card){
+function cardCurrentClose(card){
   const clamp=n=>Math.min(28,Math.max(1,n||1));
   const vencDia=clamp(card.vencDia),melhorDia=clamp(card.melhorDia||(vencDia>10?vencDia-10:vencDia+18));
-  const today=new Date();today.setHours(12,0,0,0);
   const at=(y,m,d)=>new Date(y,m,d,12,0,0);
+  const today=new Date();today.setHours(12,0,0,0);
+  const dueFromClose=close=>{let due=at(close.getFullYear(),close.getMonth(),vencDia);if(due<=close)due=at(close.getFullYear(),close.getMonth()+1,vencDia);return due};
   let close=at(today.getFullYear(),today.getMonth(),melhorDia);
   if(close>today)close=at(close.getFullYear(),close.getMonth()-1,melhorDia);
-  let due=at(close.getFullYear(),close.getMonth(),vencDia);
-  if(due<=close)due=at(close.getFullYear(),close.getMonth()+1,vencDia);
-  let guard=0;
-  while(due<today&&guard<24){close=at(close.getFullYear(),close.getMonth()+1,melhorDia);due=at(close.getFullYear(),close.getMonth(),vencDia);if(due<=close)due=at(close.getFullYear(),close.getMonth()+1,vencDia);guard++}
-  const prevClose=at(close.getFullYear(),close.getMonth()-1,melhorDia);
+  let due=dueFromClose(close),guard=0;
+  while(due<today&&guard<24){close=at(close.getFullYear(),close.getMonth()+1,melhorDia);due=dueFromClose(close);guard++}
+  return {close,vencDia,melhorDia,at,dueFromClose};
+}
+function cardInvoiceAt(ctx,card,offset){
+  const {close:close0,melhorDia,at,dueFromClose}=cardCurrentClose(card);
+  let close=close0;
+  for(let i=0;i<Math.abs(offset||0);i++)close=at(close.getFullYear(),close.getMonth()+(offset>0?1:-1),melhorDia);
+  const due=dueFromClose(close),prevClose=at(close.getFullYear(),close.getMonth()-1,melhorDia);
   const toISO=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
   const startISO=toISO(prevClose),endISO=toISO(close),dueISO=toISO(due);
-  let total=0;
-  S.fin[ctx].entries.forEach(e=>{if(e.conta!==card.id||e.date<=startISO||e.date>endISO)return;total+=catOf(ctx,e.cat).t==='R'?-e.valor:e.valor});
-  const daysLeft=Math.round((due-today)/86400000);
-  return {total,due:dueISO,daysLeft};
+  const items=[];let total=0;
+  S.fin[ctx].entries.forEach(e=>{if(e.conta!==card.id||e.date<=startISO||e.date>endISO)return;total+=catOf(ctx,e.cat).t==='R'?-e.valor:e.valor;items.push(e)});
+  items.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const today=new Date();today.setHours(12,0,0,0);
+  const status=endISO<todayISO()?'Fechada':'Aberta',daysLeft=Math.round((due-today)/86400000);
+  return {total,close:endISO,due:dueISO,status,daysLeft,items,start:startISO};
 }
+function cardInvoice(ctx,card){return cardInvoiceAt(ctx,card,0)}
 function cardsSection(){
   const groups=[['PJ','Negócio (PJ)'],['PF','Pessoal (PF)']].map(([ctx,label])=>{
     const cards=(S.fin[ctx].accounts||[]).filter(a=>!a.arch&&a.tipo==='cartao');
@@ -978,11 +986,47 @@ function cardsSection(){
     let sub=0;
     g.cards.forEach(c=>{
       const inv=cardInvoice(g.ctx,c);sub+=inv.total;
-      h+=`<button class="row between" style="width:100%;text-align:left;background:none;border:0;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer" data-act="opencard" data-v="${c.id}" data-c="${g.ctx}"><div><div style="font-weight:500">${esc(c.n)}</div><div class="small muted">vence ${inv.due.slice(8)}/${inv.due.slice(5,7)}${inv.daysLeft>=0?` · em ${inv.daysLeft} dia(s)`:' · venceu'}</div></div><b class="${inv.total<0?'neg':''}">${brl(inv.total)}</b></button>`;
+      h+=`<button class="row between" style="width:100%;text-align:left;background:none;border:0;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer" data-act="opencardinv" data-v="${c.id}" data-c="${g.ctx}"><div><div style="font-weight:500">${esc(c.n)}</div><div class="small muted">vence ${inv.due.slice(8)}/${inv.due.slice(5,7)}${inv.daysLeft>=0?` · em ${inv.daysLeft} dia(s)`:' · venceu'}</div></div><b class="${inv.total<0?'neg':''}">${brl(inv.total)}</b></button>`;
     });
     if(g.cards.length>1)h+=`<div class="row between" style="padding:9px 0 2px"><span class="small" style="font-weight:600">Total ${g.label}</span><b class="${sub<0?'neg':''}">${brl(sub)}</b></div>`;
   });
   h+=`<p class="small muted" style="margin-top:10px">Estimativa com base no dia de vencimento e no melhor dia de compra cadastrados em cada cartão.</p></div>`;
+  return h;
+}
+function allCardsFlat(){
+  const out=[];['PJ','PF'].forEach(ctx=>{(S.fin[ctx].accounts||[]).filter(a=>!a.arch&&a.tipo==='cartao').forEach(a=>out.push(Object.assign({ctx},a)))});
+  return out;
+}
+function cardsTotalizerHTML(ctx){
+  const cards=(S.fin[ctx].accounts||[]).filter(a=>!a.arch&&a.tipo==='cartao');
+  if(!cards.length)return '';
+  let totAberto=0;
+  let h=`<div class="card"><h2 class="h-card" style="margin-bottom:4px">Cartões de crédito</h2>`;
+  cards.forEach(c=>{
+    const prev=cardInvoiceAt(ctx,c,-1),cur=cardInvoiceAt(ctx,c,0);
+    totAberto+=cur.total;
+    h+=`<button class="row between" style="width:100%;text-align:left;align-items:flex-start;background:none;border:0;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer" data-act="opencardinv" data-v="${c.id}" data-c="${ctx}"><div class="grow"><div style="font-weight:500">${esc(c.n)}</div><div class="small muted">Última fechada: ${brl(prev.total)} · venceu ${prev.due.slice(8)}/${prev.due.slice(5,7)}</div><div class="small muted">Próxima a pagar: <b style="color:var(--ink)">${brl(cur.total)}</b> · vence ${cur.due.slice(8)}/${cur.due.slice(5,7)}</div></div></button>`;
+  });
+  if(cards.length>1)h+=`<div class="row between" style="padding:10px 0 2px"><span class="small" style="font-weight:600">Total a pagar (próximas faturas)</span><b>${brl(totAberto)}</b></div>`;
+  h+=`</div>`;
+  return h;
+}
+function viewCardInv(){
+  const cards=allCardsFlat();
+  if(!cards.length){ui.page=null;return '';}
+  let cur=cards.find(c=>c.ctx===ui.cardCtx&&c.id===ui.cardId)||cards[0];
+  ui.cardCtx=cur.ctx;ui.cardId=cur.id;
+  const off=ui.cardOffset||0,inv=cardInvoiceAt(cur.ctx,cur,off);
+  const monthLbl=MES[+inv.due.slice(5,7)-1]+' de '+inv.due.slice(0,4);
+  let h=`<div class="rd-top"><button class="iconbtn" data-act="closepage" aria-label="Voltar">${svg('back')}</button><div class="grow" style="font-weight:600">Cartões de crédito</div></div><div style="padding:8px 18px 60px">`;
+  h+=`<div class="chips" style="margin:6px 0 10px;flex-wrap:nowrap;overflow-x:auto">${cards.map(c=>`<button class="chip" data-act="selcard" data-v="${c.id}" data-c="${c.ctx}" aria-pressed="${c.id===cur.id&&c.ctx===cur.ctx}">${esc(c.n)}</button>`).join('')}</div>`;
+  h+=`<div class="row between" style="align-items:center;margin:4px 0 10px"><button class="iconbtn" data-act="cardnav" data-v="-1" aria-label="Fatura anterior">${svg('back')}</button><b style="font-size:16px">${monthLbl}</b><button class="iconbtn" data-act="cardnav" data-v="1" aria-label="Próxima fatura">${svg('chev')}</button></div>`;
+  h+=`<div class="card"><div class="row between" style="align-items:flex-start"><div><b style="font-size:17px">${esc(cur.n)}</b><div class="small muted">${esc(cur.bandeira||'')}${cur.banco?' · '+esc(cur.banco):''}</div></div><span class="pill ${inv.status==='Fechada'?'ok':'warn'}">${inv.status==='Fechada'?'Fatura fechada':'Fatura aberta'}</span></div>
+  <div class="grid2 small" style="margin-top:14px;gap:10px"><div class="muted">Fechamento<br><b style="color:var(--ink)">${inv.close.slice(8)}/${inv.close.slice(5,7)}</b></div><div class="muted">Vencimento<br><b style="color:var(--ink)">${inv.due.slice(8)}/${inv.due.slice(5,7)}</b></div></div>
+  <div style="margin-top:14px"><span class="small muted">Valor da fatura</span><div style="font:600 26px 'Poppins',sans-serif" class="${inv.total<0?'neg':''}">${brl(inv.total)}</div></div></div>`;
+  h+=`<h2 class="h-card" style="margin:18px 2px 0">Lançamentos da fatura</h2>`;
+  h+=inv.items.length?`<div class="card">${inv.items.map(e=>entryRow(cur.ctx,e)).join('')}</div>`:`<div class="empty">Nenhum lançamento nesta fatura.</div>`;
+  h+=`</div>`;
   return h;
 }
 function invTotalByCtx(ctx){
@@ -1154,6 +1198,7 @@ function viewResumoPF(ctx,sm){
    ${kpi('Receita a receber',brl(sm.recAberto),'ainda não recebida','var(--sage-d)')}
    ${kpi('Despesa a pagar',brl(sm.desAberto),'ainda não paga','var(--terra-m)')}
   </div>`;
+  h+=cardsTotalizerHTML(ctx);
   // receitas x despesas por mês
   h+=`<div class="card"><h2 class="h-card">Receitas x despesas por mês</h2><p class="small muted" style="margin:0 0 6px">${ui.year}${ui.period==='all'?'':' · mês selecionado em destaque'}</p>${chartMonths(ctx)}<div class="row small" style="gap:16px;margin-top:6px"><span><span class="dot" style="background:var(--sage-d)"></span>Receitas</span><span><span class="dot" style="background:var(--terra-m)"></span>Despesas</span></div></div>`;
   const ac=chartAcum(ctx);
@@ -1255,6 +1300,7 @@ function viewResumoPJ(ctx,sm){
   if(meta>0)h+=`<div class="card"><div class="row between"><h2 class="h-card" style="margin:0">Meta de faturamento</h2><b>${pct1(rec/meta*100)}</b></div><div class="bar sage" style="margin:12px 0 6px"><i style="width:${Math.min(100,rec/meta*100)}%"></i></div><div class="small muted">${brl(rec)} de ${brl(meta)} ${ui.period==='all'?'no ano':'no mês'}</div></div>`;
   h+=prodSection(sm);
   h+=waterfall(sm);
+  h+=cardsTotalizerHTML(ctx);
   h+=`<div class="card"><h2 class="h-card">Receitas x despesas por mês</h2><p class="small muted" style="margin:0 0 6px">${ui.year}${ui.period==='all'?'':' · mês selecionado em destaque'}</p>${chartMonths(ctx)}<div class="row small" style="gap:16px;margin-top:6px"><span><span class="dot" style="background:var(--sage-d)"></span>Receitas</span><span><span class="dot" style="background:var(--terra-m)"></span>Despesas</span></div></div>`;
   const ac=chartAcum(ctx);
   if(ac)h+=`<div class="card"><h2 class="h-card">Resultado de caixa acumulado no ano</h2><p class="small muted" style="margin:0 0 6px">Receitas menos todas as saídas, mês a mês.</p>${ac}</div>`;
@@ -1280,8 +1326,8 @@ function entryRow(ctx,e){
 function mkBalanceAsOf(ctx,selAcc){
   const F=S.fin[ctx];
   if(selAcc){
-    const base=selAcc.saldoIni||0,dataIni=selAcc.dataIni;
-    const ents=F.entries.filter(e=>e.conta===selAcc.id&&e.pago&&(!dataIni||e.date>=dataIni));
+    const base=selAcc.saldoIni||0,dataIni=selAcc.dataIni,isCard=selAcc.tipo==='cartao';
+    const ents=F.entries.filter(e=>e.conta===selAcc.id&&(isCard||e.pago)&&(!dataIni||e.date>=dataIni));
     return d=>base+ents.filter(e=>e.date<=d).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0);
   }
   const ci=F.caixaM?F.caixaM+'-01':'',base=F.caixa||0;
@@ -1820,8 +1866,8 @@ function allAccounts(scope){const out=[];['PJ','PF'].forEach(ctx=>{if(scope&&sco
 const accFind=(ctx,id)=>(S.fin[ctx].accounts||[]).find(a=>a.id===id);
 function accName(ctx,id){const a=accFind(ctx,id);return a?a.n:'Conta removida'}
 function accCalc(ctx,a){
-  const F=S.fin[ctx];let bal=a.saldoIni||0;
-  F.entries.forEach(e=>{if(e.conta!==a.id||!e.pago)return;if(a.dataIni&&e.date<a.dataIni)return;bal+=catOf(ctx,e.cat).t==='R'?e.valor:-e.valor});
+  const F=S.fin[ctx];let bal=a.saldoIni||0,isCard=a.tipo==='cartao';
+  F.entries.forEach(e=>{if(e.conta!==a.id||(!isCard&&!e.pago))return;if(a.dataIni&&e.date<a.dataIni)return;bal+=catOf(ctx,e.cat).t==='R'?e.valor:-e.valor});
   return bal;
 }
 const accUsed=(ctx,id)=>S.fin[ctx].entries.some(e=>e.conta===id);
@@ -2242,6 +2288,7 @@ function render(top){
   else if(ui.page==='contas')body=viewContas();
   else if(ui.page==='import')body=viewImport();
   else if(ui.page==='goal')body=viewGoalForm();
+  else if(ui.page==='cardinv')body=viewCardInv();
   else if(ui.reader!=null)body=viewReader();
   else body=header()+'<main>'+VIEWS[ui.tab]()+'</main>'+tabbar();
   $('#app').innerHTML=body+sheetHTML();
@@ -2335,7 +2382,9 @@ document.addEventListener('click',function(ev){
    case 'deltipo':{if(ui.del!=='tipo:'+v){ui.del='tipo:'+v;render();break}S.invTipos=S.invTipos.filter(t=>t!==v);ui.del=null;save();render();break}
    case 'usecalcval':{const i=S.fin[el.dataset.c].invs.find(x=>x.id===v);if(i&&i.qtd>0&&i.preco>0){i.saldoIni=Math.round(i.qtd*i.preco*100)/100;if(!i.dataIni)i.dataIni=todayISO();save();render();toast('Saldo inicial atualizado')}break}
    case 'toggleinv':ui.invOpen=ui.invOpen||{};ui.invOpen[v]=!ui.invOpen[v];render();break;
-   case 'opencard':{const c2=el.dataset.c;ui.ctx=c2;ui.finTab='lanc';ui.lancConta=v;ui.period=String(new Date().getMonth());ui.year=new Date().getFullYear();setTab('controle');break}
+   case 'opencardinv':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;ui.page='cardinv';render(true);break}
+   case 'selcard':{ui.cardCtx=el.dataset.c;ui.cardId=v;ui.cardOffset=0;render();break}
+   case 'cardnav':{ui.cardOffset=(ui.cardOffset||0)+(+v);render();break}
    case 'togglezeroinv':ui.invZeroOpen=!ui.invZeroOpen;render();break;
    case 'naminv':ui.naminvCtx=el.dataset.c==='PJ'?'PJ':'PF';ui.sheet='naminv';render();break;
    case 'savenaminv':{const n=$('#nm_n').value.trim();if(!n){toast('Digite o nome do investimento');break}const c=el.dataset.c==='PJ'?'PJ':'PF';const F=S.fin[c],res={};allCats(c).forEach(cc=>{if(cc.kind==='res')res[cc.id]=1});const i={id:uid(),n,tipo:$('#nm_t').value};F.invs.push(i);F.entries.forEach(e=>{if(!e.inv&&res[e.cat])e.inv=i.id});F.invRecs.forEach(r=>{if(!r.inv)r.inv=i.id});save();ui.sheet=null;ui.naminvCtx=null;render();toast('Investimento nomeado e organizado');break}
