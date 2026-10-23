@@ -912,7 +912,7 @@ function finSummary(ctx){
     if(!e.pago){if(c.t==='R')recAberto+=e.valor;else desAberto+=e.valor}});
   let caixa=F.caixa||0;
   const ci=F.caixaM?F.caixaM+'-01':'';
-  F.entries.forEach(e=>{if(e.pago&&(!ci||e.date>=ci))caixa+=cg(e.cat).t==='R'?e.valor:-e.valor});
+  F.entries.forEach(e=>{const ed=entryEffDate(ctx,e);if(e.pago&&(!ci||ed>=ci))caixa+=cg(e.cat).t==='R'?e.valor:-e.valor});
   return {pe,rec,resgRec,des,res:rec-des,byCat,byProd,k,fixo,vari,opFixo,opVar,nVendas,caixa,recAberto,desAberto};
 }
 function toast(m){const h=$('#toast-host');h.innerHTML=`<div class="toast" role="status">${esc(m)}</div>`;clearTimeout(toast.t);toast.t=setTimeout(()=>{h.innerHTML=''},2600)}
@@ -930,6 +930,23 @@ function gauge(score,color){
 }
 
 
+function cardDueFor(card,dateISO){
+  const clamp=n=>Math.min(28,Math.max(1,n||1));
+  const vencDia=clamp(card.vencDia),melhorDia=clamp(card.melhorDia||(vencDia>10?vencDia-10:vencDia+18));
+  const at=(y,m,d)=>new Date(y,m,d,12,0,0);
+  const [y0,m0,d0]=dateISO.split('-').map(Number),pdate=at(y0,m0-1,d0);
+  let close=at(y0,m0-1,melhorDia);
+  if(close<pdate)close=at(close.getFullYear(),close.getMonth()+1,melhorDia);
+  let due=at(close.getFullYear(),close.getMonth(),vencDia);
+  if(due<=close)due=at(close.getFullYear(),close.getMonth()+1,vencDia);
+  return due.getFullYear()+'-'+p2(due.getMonth()+1)+'-'+p2(due.getDate());
+}
+function entryEffDate(ctx,e){
+  if(!e.conta)return e.date;
+  const a=accFind(ctx,e.conta);
+  if(!a||a.tipo!=='cartao'||!a.vencDia)return e.date;
+  return cardDueFor(a,e.date);
+}
 function cardInvoice(ctx,card){
   const clamp=n=>Math.min(28,Math.max(1,n||1));
   const vencDia=clamp(card.vencDia),melhorDia=clamp(card.melhorDia||(vencDia>10?vencDia-10:vencDia+18));
@@ -961,7 +978,7 @@ function cardsSection(){
     let sub=0;
     g.cards.forEach(c=>{
       const inv=cardInvoice(g.ctx,c);sub+=inv.total;
-      h+=`<div class="row between" style="padding:9px 0;border-bottom:1px solid var(--line)"><div><div style="font-weight:500">${esc(c.n)}</div><div class="small muted">vence ${inv.due.slice(8)}/${inv.due.slice(5,7)}${inv.daysLeft>=0?` · em ${inv.daysLeft} dia(s)`:' · venceu'}</div></div><b class="${inv.total<0?'neg':''}">${brl(inv.total)}</b></div>`;
+      h+=`<button class="row between" style="width:100%;text-align:left;background:none;border:0;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer" data-act="opencard" data-v="${c.id}" data-c="${g.ctx}"><div><div style="font-weight:500">${esc(c.n)}</div><div class="small muted">vence ${inv.due.slice(8)}/${inv.due.slice(5,7)}${inv.daysLeft>=0?` · em ${inv.daysLeft} dia(s)`:' · venceu'}</div></div><b class="${inv.total<0?'neg':''}">${brl(inv.total)}</b></button>`;
     });
     if(g.cards.length>1)h+=`<div class="row between" style="padding:9px 0 2px"><span class="small" style="font-weight:600">Total ${g.label}</span><b class="${sub<0?'neg':''}">${brl(sub)}</b></div>`;
   });
@@ -1255,7 +1272,9 @@ function entryRow(ctx,e){
   const c=catOf(ctx,e.cat),isR=c.t==='R';
   const statusPill=`<span class="pill ${e.pago?'ok':'warn'}" style="margin-left:4px">${e.pago?(isR?'Recebido':'Pago'):'Em aberto'}</span>`;
   const statusAct=e.pago?`<button class="small muted" style="font-weight:600;text-decoration:underline" data-act="unmarkpaid" data-v="${e.id}">Marcar como em aberto</button>`:`<button class="small" style="font-weight:600;text-decoration:underline;color:var(--sage-d)" data-act="markpaid" data-v="${e.id}">Marcar como ${isR?'recebido':'pago'}</button>`;
-  return `<div class="entry"><div class="erow"><div class="date">${e.date.slice(8)}/${e.date.slice(5,7)}</div><div class="grow"><div class="etitle">${esc(e.desc||c.n)}${e.recId?' <span class=\'pill\' style=\'margin-left:4px\'>Recorrente</span>':''}${statusPill}</div><div class="esub">${esc(c.n)}${e.prod?' · '+esc(prodName(e.prod)):''}${e.inv?' · '+esc(invName(ctx,e.inv)):''}${e.conta?' · '+esc(accName(ctx,e.conta)):''}${!isR?' · '+esc(e.fv||'Variável'):''}${e.pt>1?` · parcela ${e.pa}/${e.pt}`:''}</div></div><div class="evalue ${isR?'pos':''}">${isR?'+':'−'} ${brl(e.valor)}</div></div><div class="eacts">${(!e.fromRec&&!e.xferId)?statusAct:''}${!e.xferId?`<button class="muted" data-act="editentry" data-v="${e.id}">Editar</button>`:''}<button class="${ui.del===e.id?'neg':'muted'}" data-act="del" data-v="${e.id}">${ui.del===e.id?'Confirmar exclusão':'Excluir'}</button></div></div>`;
+  const acc=e.conta?accFind(ctx,e.conta):null,ed=entryEffDate(ctx,e);
+  const dueHint=(acc&&acc.tipo==='cartao'&&ed!==e.date)?` · vence ${ed.slice(8)}/${ed.slice(5,7)}`:'';
+  return `<div class="entry"><div class="erow"><div class="date">${e.date.slice(8)}/${e.date.slice(5,7)}</div><div class="grow"><div class="etitle">${esc(e.desc||c.n)}${e.recId?' <span class=\'pill\' style=\'margin-left:4px\'>Recorrente</span>':''}${statusPill}</div><div class="esub">${esc(c.n)}${e.prod?' · '+esc(prodName(e.prod)):''}${e.inv?' · '+esc(invName(ctx,e.inv)):''}${e.conta?' · '+esc(accName(ctx,e.conta)):''}${!isR?' · '+esc(e.fv||'Variável'):''}${e.pt>1?` · parcela ${e.pa}/${e.pt}`:''}${dueHint}</div></div><div class="evalue ${isR?'pos':''}">${isR?'+':'−'} ${brl(e.valor)}</div></div><div class="eacts">${(!e.fromRec&&!e.xferId)?statusAct:''}${!e.xferId?`<button class="muted" data-act="editentry" data-v="${e.id}">Editar</button>`:''}<button class="${ui.del===e.id?'neg':'muted'}" data-act="del" data-v="${e.id}">${ui.del===e.id?'Confirmar exclusão':'Excluir'}</button></div></div>`;
 }
 
 function mkBalanceAsOf(ctx,selAcc){
@@ -1266,8 +1285,8 @@ function mkBalanceAsOf(ctx,selAcc){
     return d=>base+ents.filter(e=>e.date<=d).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0);
   }
   const ci=F.caixaM?F.caixaM+'-01':'',base=F.caixa||0;
-  const ents=F.entries.filter(e=>e.pago&&(!ci||e.date>=ci));
-  return d=>base+ents.filter(e=>e.date<=d).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0);
+  const ents=F.entries.filter(e=>e.pago&&(!ci||entryEffDate(ctx,e)>=ci)).map(e=>({e,ed:entryEffDate(ctx,e)}));
+  return d=>base+ents.filter(x=>x.ed<=d).reduce((a,x)=>a+(catOf(ctx,x.e.cat).t==='R'?x.e.valor:-x.e.valor),0);
 }
 function dayGroupsHTML(ctx,items,balFn){
   let h='',curDate=null;
@@ -2316,6 +2335,7 @@ document.addEventListener('click',function(ev){
    case 'deltipo':{if(ui.del!=='tipo:'+v){ui.del='tipo:'+v;render();break}S.invTipos=S.invTipos.filter(t=>t!==v);ui.del=null;save();render();break}
    case 'usecalcval':{const i=S.fin[el.dataset.c].invs.find(x=>x.id===v);if(i&&i.qtd>0&&i.preco>0){i.saldoIni=Math.round(i.qtd*i.preco*100)/100;if(!i.dataIni)i.dataIni=todayISO();save();render();toast('Saldo inicial atualizado')}break}
    case 'toggleinv':ui.invOpen=ui.invOpen||{};ui.invOpen[v]=!ui.invOpen[v];render();break;
+   case 'opencard':{const c2=el.dataset.c;ui.ctx=c2;ui.finTab='lanc';ui.lancConta=v;ui.period=String(new Date().getMonth());ui.year=new Date().getFullYear();setTab('controle');break}
    case 'togglezeroinv':ui.invZeroOpen=!ui.invZeroOpen;render();break;
    case 'naminv':ui.naminvCtx=el.dataset.c==='PJ'?'PJ':'PF';ui.sheet='naminv';render();break;
    case 'savenaminv':{const n=$('#nm_n').value.trim();if(!n){toast('Digite o nome do investimento');break}const c=el.dataset.c==='PJ'?'PJ':'PF';const F=S.fin[c],res={};allCats(c).forEach(cc=>{if(cc.kind==='res')res[cc.id]=1});const i={id:uid(),n,tipo:$('#nm_t').value};F.invs.push(i);F.entries.forEach(e=>{if(!e.inv&&res[e.cat])e.inv=i.id});F.invRecs.forEach(r=>{if(!r.inv)r.inv=i.id});save();ui.sheet=null;ui.naminvCtx=null;render();toast('Investimento nomeado e organizado');break}
@@ -2444,13 +2464,13 @@ function saveEntry(){
     const recId=uid(),base=Date.now(),N=24,[y0,m0,d0]=date.split('-').map(Number);
     for(let k=0;k<N;k++){
       const d=new Date(y0,m0-1+k,d0,12,0,0),dt=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
-      F.entries.push({id:base+k,date:dt,cat,desc,valor:val,fv:'Fixo',pa:1,pt:1,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:k===0?invQtd:undefined,invPreco:k===0?invPreco:undefined,goals:goals.length?goals:undefined,conta:conta||undefined,recId,pago:dt<=todayISO()});
+      F.entries.push({id:base+k,date:dt,cat,desc,valor:val,fv:'Fixo',pa:1,pt:1,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:k===0?invQtd:undefined,invPreco:k===0?invPreco:undefined,goals:goals.length?goals:undefined,conta:conta||undefined,recId,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date:dt})<=todayISO()});
     }
     save();ui.sheet=null;render();toast(`Lançamento recorrente criado (próximos ${N} meses)`);return;
   }
   const base=Date.now();
-  F.entries.push({id:base,date,cat,desc,valor:val,fv,pa,pt,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:invQtd||undefined,invPreco:invPreco||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:date<=todayISO()});
-  if(gen){for(let k=1;k<=pt-pa;k++){const d2=addMonths(date,k);F.entries.push({id:base+k,date:d2,cat,desc,valor:val,fv,pa:pa+k,pt,prod:prod||undefined,qtd,inv:inv||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:d2<=todayISO()})}}
+  F.entries.push({id:base,date,cat,desc,valor:val,fv,pa,pt,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:invQtd||undefined,invPreco:invPreco||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date})<=todayISO()});
+  if(gen){for(let k=1;k<=pt-pa;k++){const d2=addMonths(date,k);F.entries.push({id:base+k,date:d2,cat,desc,valor:val,fv,pa:pa+k,pt,prod:prod||undefined,qtd,inv:inv||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date:d2})<=todayISO()})}}
   save();ui.sheet=null;render();toast(gen?`Lançamento e ${pt-pa} parcela(s) salvos`:'Lançamento salvo');
 }
 document.addEventListener('input',function(ev){
