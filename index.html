@@ -1198,6 +1198,7 @@ function donutHTML(items,total){
   return `<div class="row" style="gap:16px"><div class="donut" style="background:conic-gradient(${stops})" role="img" aria-label="Distribuição"></div><div class="grow small">${items.map((it,i)=>`<div style="margin:5px 0"><span class="dot" style="background:${PAL[i%PAL.length]}"></span>${esc(it[0])}<br><b>${brl(it[1])}</b> · ${pct1(it[1]/total*100)}</div>`).join('')}</div></div>`;
 }
 function kpi(label,value,sub,color,cls){return `<div class="kpi ${cls||''}" style="--kc:${color}"><small>${label}</small><b>${value}</b>${sub?`<span class="ks">${sub}</span>`:''}</div>`}
+function barCls(isR,real,orc){if(isR)return 'sage';if(!(orc>0))return 'neg';return real>orc?'neg':'sage'}
 function viewResumoPF(ctx,sm){
   const F=S.fin[ctx];
   const perLabel=ui.period==='all'?'no ano':'no mês';
@@ -1235,10 +1236,10 @@ function viewResumoPF(ctx,sm){
     if(!cs.length)return;
     const isR=g.t==='R';
     const real=cs.reduce((a,c)=>a+(sm.byCat[c.id]||0),0),orc=cs.reduce((a,c)=>a+bud(ctx,c.id),0);
-    const p=orc>0?Math.min(100,real/orc*100):(real>0?100:0),over=!isR&&orc>0&&real>orc;
-    h+=`<details class="term"><summary><span class="grow"><span style="display:block">${esc(g.n)}</span><span class="small muted" style="font-weight:400">${brl(real)}${orc>0?' de '+brl(orc):''}</span></span></summary><div class="bar ${over?'neg':(isR?'sage':'')}" style="margin:8px 0 4px"><i style="width:${p}%"></i></div>`;
-    cs.forEach(c=>{const rv=sm.byCat[c.id]||0,ob=bud(ctx,c.id),pp=ob>0?Math.min(100,rv/ob*100):(rv>0?100:0),ov=!isR&&ob>0&&rv>ob;
-      h+=`<div style="margin:10px 0 0"><div class="row between small"><span>${esc(c.n)}${c.arch?' (arquivada)':''}</span><span>${brl(rv)}${ob>0?' de '+brl(ob):''}</span></div><div class="bar ${ov?'neg':(isR?'sage':'')}" style="margin-top:4px;height:7px"><i style="width:${pp}%"></i></div></div>`});
+    const p=orc>0?Math.min(100,real/orc*100):(real>0?100:0);
+    h+=`<details class="term"><summary><span class="grow"><span style="display:block">${esc(g.n)}</span><span class="small muted" style="font-weight:400">${brl(real)}${orc>0?' de '+brl(orc):''}</span></span></summary><div class="bar ${barCls(isR,real,orc)}" style="margin:8px 0 4px"><i style="width:${p}%"></i></div>`;
+    cs.forEach(c=>{const rv=sm.byCat[c.id]||0,ob=bud(ctx,c.id),pp=ob>0?Math.min(100,rv/ob*100):(rv>0?100:0);
+      h+=`<div style="margin:10px 0 0"><div class="row between small"><span>${esc(c.n)}${c.arch?' (arquivada)':''}</span><span>${brl(rv)}${ob>0?' de '+brl(ob):''}</span></div><div class="bar ${barCls(isR,rv,ob)}" style="margin-top:4px;height:7px"><i style="width:${pp}%"></i></div></div>`});
     h+=`</details>`;
   });
   h+=`<div style="margin-top:12px"><button class="btn ghost small" data-act="orc">Ajustar orçamento mensal</button></div></div>`;
@@ -1265,7 +1266,7 @@ function orcTotaisHTML(ctx,sm){
     });
   });
   const pT=orcT>0?Math.min(100,realT/orcT*100):(realT>0?100:0),pS=orcSemT>0?Math.min(100,realSemT/orcSemT*100):(realSemT>0?100:0);
-  return `<div style="margin-bottom:16px"><div class="row between"><b>Total geral</b><span class="small muted">${brl(realT)}${orcT>0?' de '+brl(orcT):''}</span></div><div class="bar" style="margin:8px 0 14px"><i style="width:${pT}%"></i></div><div class="row between"><b>Total sem investimentos</b><span class="small muted">${brl(realSemT)}${orcSemT>0?' de '+brl(orcSemT):''}</span></div><div class="bar" style="margin:8px 0 2px"><i style="width:${pS}%"></i></div></div>`;
+  return `<div style="margin-bottom:16px"><div class="row between"><b>Total geral</b><span class="small muted">${brl(realT)}${orcT>0?' de '+brl(orcT):''}</span></div><div class="bar ${barCls(false,realT,orcT)}" style="margin:8px 0 14px"><i style="width:${pT}%"></i></div><div class="row between"><b>Total sem investimentos</b><span class="small muted">${brl(realSemT)}${orcSemT>0?' de '+brl(orcSemT):''}</span></div><div class="bar ${barCls(false,realSemT,orcSemT)}" style="margin:8px 0 2px"><i style="width:${pS}%"></i></div></div>`;
 }
 function grupoOrcadoHTML(ctx,sm){
   let h=`<div class="card"><h2 class="h-card" style="margin:0">Orçado x realizado por grupo</h2><p class="small muted" style="margin:4px 0 4px">${ui.period==='all'?'Soma dos orçamentos de cada mês do ano.':'Orçamento do mês selecionado. Toque em um grupo para ver as subcategorias.'}</p>`;
@@ -1275,10 +1276,10 @@ function grupoOrcadoHTML(ctx,sm){
     if(!cs.length)return;
     const isR=g.t==='R';
     const real=cs.reduce((a,c)=>a+(sm.byCat[c.id]||0),0),orc=cs.reduce((a,c)=>a+bud(ctx,c.id),0);
-    const p=orc>0?Math.min(100,real/orc*100):(real>0?100:0),over=!isR&&orc>0&&real>orc;
-    h+=`<details class="term"><summary><span class="grow"><span style="display:block">${esc(g.n)}</span><span class="small muted" style="font-weight:400">${brl(real)}${orc>0?' de '+brl(orc):''}</span></span></summary><div class="bar ${over?'neg':(isR?'sage':'')}" style="margin:8px 0 4px"><i style="width:${p}%"></i></div>`;
-    cs.forEach(c=>{const rv=sm.byCat[c.id]||0,ob=bud(ctx,c.id),pp=ob>0?Math.min(100,rv/ob*100):(rv>0?100:0),ov=!isR&&ob>0&&rv>ob;
-      h+=`<div style="margin:10px 0 0"><div class="row between small"><span>${esc(c.n)}${c.arch?' (arquivada)':''}</span><span>${brl(rv)}${ob>0?' de '+brl(ob):''}</span></div><div class="bar ${ov?'neg':(isR?'sage':'')}" style="margin-top:4px;height:7px"><i style="width:${pp}%"></i></div></div>`});
+    const p=orc>0?Math.min(100,real/orc*100):(real>0?100:0);
+    h+=`<details class="term"><summary><span class="grow"><span style="display:block">${esc(g.n)}</span><span class="small muted" style="font-weight:400">${brl(real)}${orc>0?' de '+brl(orc):''}</span></span></summary><div class="bar ${barCls(isR,real,orc)}" style="margin:8px 0 4px"><i style="width:${p}%"></i></div>`;
+    cs.forEach(c=>{const rv=sm.byCat[c.id]||0,ob=bud(ctx,c.id),pp=ob>0?Math.min(100,rv/ob*100):(rv>0?100:0);
+      h+=`<div style="margin:10px 0 0"><div class="row between small"><span>${esc(c.n)}${c.arch?' (arquivada)':''}</span><span>${brl(rv)}${ob>0?' de '+brl(ob):''}</span></div><div class="bar ${barCls(isR,rv,ob)}" style="margin-top:4px;height:7px"><i style="width:${pp}%"></i></div></div>`});
     h+=`</details>`;
   });
   return h+`<div style="margin-top:12px"><button class="btn ghost small" data-act="orc">Ajustar orçamento mensal</button></div></div>`;
@@ -2427,11 +2428,11 @@ function calcRefresh(){
 }
 function openCalc(targetId){
   if(!targetId)return;
+  const existing=document.getElementById('calcOverlay');if(existing)existing.remove();
   const input=document.getElementById(targetId);
   let init='';
   if(input&&input.value&&!isNaN(parseNum(input.value)))init=String(input.value).trim();
   calcSt={target:targetId,expr:init};
-  closeCalcDom();
   document.body.insertAdjacentHTML('beforeend',calcOverlayHTML());
 }
 function closeCalcDom(){const el=document.getElementById('calcOverlay');if(el)el.remove();calcSt=null}
