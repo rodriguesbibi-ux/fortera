@@ -1239,8 +1239,8 @@ function viewResumoPF(ctx,sm){
   });
   h+=`<div style="margin-top:12px"><button class="btn ghost small" data-act="orc">Ajustar orçamento mensal</button></div></div>`;
   // despesas por grupo
-  const ge=groupsOf(ctx).filter(g=>g.t==='D').map(g=>[g.n,allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)]).filter(x=>x[1]>0);
-  if(sm.des>0&&ge.length)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 10px">Despesas do período por grupo.</p>${donutHTML(ge,sm.des)}</div>`;
+  const ge=groupsOf(ctx).filter(g=>g.t==='D'&&g.kind!=='res').map(g=>[g.n,allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)]).filter(x=>x[1]>0);
+  if(sm.desSemInv>0&&ge.length)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 10px">Despesas do período por grupo, sem contar investimentos.</p>${donutHTML(ge,sm.desSemInv)}</div>`;
   const td=sm.fixo+sm.vari;
   if(td>0)h+=`<div class="card"><h2 class="h-card">Despesas fixas x variáveis</h2><p class="small muted" style="margin:0 0 10px">Quanto do gasto se repete todo mês e quanto pode ser ajustado.</p>${donutHTML([['Fixas',sm.fixo],['Variáveis',sm.vari]],td)}</div>`;
   return h;
@@ -1340,8 +1340,8 @@ function viewResumoPJ(ctx,sm){
   const ac=chartAcum(ctx);
   if(ac)h+=`<div class="card"><h2 class="h-card">Resultado de caixa acumulado no ano</h2><p class="small muted" style="margin:0 0 6px">Receitas menos todas as saídas, mês a mês.</p>${ac}</div>`;
   h+=grupoOrcadoHTML(ctx,sm);
-  const ge=groupsOf(ctx).filter(g=>g.t==='D').map(g=>[g.n,allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)]).filter(x=>x[1]>0);
-  if(sm.des>0&&ge.length)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 10px">Saídas do período por grupo.</p>${donutHTML(ge,sm.des)}</div>`;
+  const ge=groupsOf(ctx).filter(g=>g.t==='D'&&g.kind!=='res').map(g=>[g.n,allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)]).filter(x=>x[1]>0);
+  if(sm.desSemInv>0&&ge.length)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 10px">Saídas do período por grupo, sem contar investimentos.</p>${donutHTML(ge,sm.desSemInv)}</div>`;
   const td=sm.opFixo+sm.opVar;
   if(td>0)h+=`<div class="card"><h2 class="h-card">Custos operacionais: fixos x variáveis</h2><p class="small muted" style="margin:0 0 10px">Os fixos entram no ponto de equilíbrio; os variáveis acompanham as vendas.</p>${donutHTML([['Fixos',sm.opFixo],['Variáveis',sm.opVar]],td)}</div>`;
   return h;
