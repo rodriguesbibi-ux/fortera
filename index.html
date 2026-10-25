@@ -1225,6 +1225,7 @@ function viewResumoPF(ctx,sm){
   if(ac)h+=`<div class="card"><h2 class="h-card">Resultado acumulado no ano</h2><p class="small muted" style="margin:0 0 6px">Soma mês a mês de receitas menos despesas, incluindo parcelas futuras já lançadas.</p>${ac}</div>`;
   // orçado x realizado por grupo
   h+=`<div class="card"><div class="row between"><h2 class="h-card" style="margin:0">Orçado x realizado por grupo</h2></div><p class="small muted" style="margin:4px 0 4px">${ui.period==='all'?'Soma dos orçamentos de cada mês do ano.':'Orçamento do mês selecionado. Toque em um grupo para ver as subcategorias.'}</p>`;
+  h+=orcTotaisHTML(ctx,sm);
   groupsOf(ctx).forEach(g=>{
     const cs=allCats(ctx).filter(c=>c.gid===g.id&&(!c.arch||(sm.byCat[c.id]||0)>0||bud(ctx,c.id)>0));
     if(!cs.length)return;
@@ -1249,8 +1250,22 @@ function ctxSeg(ctx){return `<div class="seg ctx" role="group" aria-label="Módu
 const modCls=()=>'mod-'+ui.ctx.toLowerCase();
 function modBanner(ctx){return ctx==='PJ'?`<div class="modbanner"><div><b>Módulo Negócio (PJ)</b><span class="small muted">Faturamento, custos, lucro e produtos da sua empresa</span></div></div>`:`<div class="modbanner"><div><b>Módulo Pessoal (PF)</b><span class="small muted">Receitas, despesas e reservas da sua casa</span></div></div>`}
 const prodName=id=>{const p=(S.fin.PJ.products||[]).find(x=>x.id===id);return p?p.n:'Produto removido'};
+function orcTotaisHTML(ctx,sm){
+  let orcT=0,realT=0,orcSemT=0,realSemT=0;
+  groupsOf(ctx).forEach(g=>{
+    const cs=allCats(ctx).filter(c=>c.gid===g.id&&(!c.arch||(sm.byCat[c.id]||0)>0||bud(ctx,c.id)>0));
+    cs.forEach(c=>{
+      const rv=sm.byCat[c.id]||0,ob=bud(ctx,c.id),isInv=c.kind==='res'||c.sys==='resgate'||c.sys==='divid'||c.sys==='transfin';
+      orcT+=ob;realT+=rv;
+      if(!isInv){orcSemT+=ob;realSemT+=rv}
+    });
+  });
+  const pT=orcT>0?Math.min(100,realT/orcT*100):(realT>0?100:0),pS=orcSemT>0?Math.min(100,realSemT/orcSemT*100):(realSemT>0?100:0);
+  return `<div style="margin-bottom:16px"><div class="row between"><b>Total geral</b><span class="small muted">${brl(realT)}${orcT>0?' de '+brl(orcT):''}</span></div><div class="bar" style="margin:8px 0 14px"><i style="width:${pT}%"></i></div><div class="row between"><b>Total sem investimentos</b><span class="small muted">${brl(realSemT)}${orcSemT>0?' de '+brl(orcSemT):''}</span></div><div class="bar" style="margin:8px 0 2px"><i style="width:${pS}%"></i></div></div>`;
+}
 function grupoOrcadoHTML(ctx,sm){
   let h=`<div class="card"><h2 class="h-card" style="margin:0">Orçado x realizado por grupo</h2><p class="small muted" style="margin:4px 0 4px">${ui.period==='all'?'Soma dos orçamentos de cada mês do ano.':'Orçamento do mês selecionado. Toque em um grupo para ver as subcategorias.'}</p>`;
+  h+=orcTotaisHTML(ctx,sm);
   groupsOf(ctx).forEach(g=>{
     const cs=allCats(ctx).filter(c=>c.gid===g.id&&(!c.arch||(sm.byCat[c.id]||0)>0||bud(ctx,c.id)>0));
     if(!cs.length)return;
