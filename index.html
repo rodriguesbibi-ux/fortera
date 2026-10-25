@@ -915,7 +915,7 @@ function finSummary(ctx){
   let caixa=F.caixa||0;
   const ci=F.caixaM?F.caixaM+'-01':'';
   F.entries.forEach(e=>{const ed=entryEffDate(ctx,e);if(e.pago&&(!ci||ed>=ci))caixa+=cg(e.cat).t==='R'?e.valor:-e.valor});
-  return {pe,rec,resgRec,des,res:rec-des,byCat,byProd,k,fixo,vari,opFixo,opVar,nVendas,caixa,recAberto,desAberto};
+  return {pe,rec,resgRec,des,res:rec-des,byCat,byProd,k,fixo,vari,opFixo,opVar,nVendas,caixa,recAberto,desAberto,recSemInv:rec-resgRec,desSemInv:des-(k.res||0)};
 }
 function toast(m){const h=$('#toast-host');h.innerHTML=`<div class="toast" role="status">${esc(m)}</div>`;clearTimeout(toast.t);toast.t=setTimeout(()=>{h.innerHTML=''},2600)}
 
@@ -1208,6 +1208,8 @@ function viewResumoPF(ctx,sm){
    <div class="kpi wide" style="--kc:var(--terra)"><small>Disponível em caixa</small><b>${brl(sm.caixa)}</b><span class="ks">${caixaSub(ctx)}</span></div>
    ${kpi('Receitas',brl(sm.rec),sm.resgRec>0?'inclui '+brl(sm.resgRec)+' de resgates':perLabel,'var(--sage-d)')}
    ${kpi('Despesas',brl(sm.des),perLabel,'var(--terra-m)')}
+   ${kpi('Receitas sem investimentos',brl(sm.recSemInv),'sem resgates/dividendos','var(--sage-d)')}
+   ${kpi('Despesas sem investimentos',brl(sm.desSemInv),'sem aportes/reservas','var(--terra-m)')}
    ${kpi('Resultado do período',`<span class="${sm.res<0?'neg':'pos'}">${brl(sm.res)}</span>`,'receitas − despesas','var(--pri)')}
    ${kpi('Margem',margem===null?'–':`<span class="${margem<0?'neg':'pos'}">${pct1(margem)}</span>`,'resultado ÷ receitas','var(--pri)')}
    ${kpi('Reservado / investido',brl(reservado),sm.rec>0?pct1(reservado/sm.rec*100)+' das receitas':'sem receitas no período','var(--sage-d)')}
