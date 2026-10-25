@@ -6,6 +6,9 @@
 <meta name="theme-color" content="#FAF6F0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Fortera Controle">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Fortera Controle</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -48,7 +51,8 @@ a{color:var(--pri)}
 .logo{height:38px;display:block;background:var(--logo-bg);border-radius:8px;padding:0}
 :root[data-theme="dark"] .logo{padding:4px 8px}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo{padding:4px 8px}}
-.iconbtn{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line)}
+.iconbtn{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);touch-action:manipulation}
+.iconbtn svg{pointer-events:none}
 main{padding:8px 18px calc(96px + env(safe-area-inset-bottom,0px))}
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:560px;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:20}
 .tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:12px;font-size:11.5px;font-weight:500;color:var(--ink2)}
