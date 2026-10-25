@@ -906,16 +906,16 @@ function caixaSub(ctx){const c=S.fin[ctx].caixaM;if(!c)return 'caixa inicial + e
 function finSummary(ctx){
   const F=S.fin[ctx];const pe=F.entries.filter(inPeriod);
   const cm={};allCats(ctx).forEach(c=>{cm[c.id]=c});const cg=id=>cm[id]||catOf(ctx,id);
-  let rec=0,des=0,fixo=0,vari=0,opFixo=0,opVar=0,nVendas=0,resgRec=0,recAberto=0,desAberto=0;const byCat={},byProd={},k={op:0,imp:0,pl:0,res:0,div:0,out:0};
+  let rec=0,des=0,fixo=0,vari=0,fixoSemInv=0,variSemInv=0,opFixo=0,opVar=0,nVendas=0,resgRec=0,recAberto=0,desAberto=0;const byCat={},byProd={},k={op:0,imp:0,pl:0,res:0,div:0,out:0};
   pe.forEach(e=>{const c=cg(e.cat);byCat[e.cat]=(byCat[e.cat]||0)+e.valor;
     if(c.t==='R'&&(c.sys==='resgate'||c.sys==='transfin'||c.sys==='divid')){rec+=e.valor;resgRec+=e.valor}
     else if(c.t==='R'){rec+=e.valor;nVendas++;const pid=e.prod||'';const b=byProd[pid]=byProd[pid]||{rec:0,qtd:0,n:0};b.rec+=e.valor;b.qtd+=(e.qtd>0?e.qtd:1);b.n++}
-    else{des+=e.valor;k[c.kind]=(k[c.kind]||0)+e.valor;if(e.fv==='Fixo')fixo+=e.valor;else vari+=e.valor;if(c.kind==='op'){if(e.fv==='Fixo')opFixo+=e.valor;else opVar+=e.valor}}
+    else{des+=e.valor;k[c.kind]=(k[c.kind]||0)+e.valor;if(e.fv==='Fixo')fixo+=e.valor;else vari+=e.valor;if(c.kind!=='res'){if(e.fv==='Fixo')fixoSemInv+=e.valor;else variSemInv+=e.valor}if(c.kind==='op'){if(e.fv==='Fixo')opFixo+=e.valor;else opVar+=e.valor}}
     if(!e.pago){if(c.t==='R')recAberto+=e.valor;else desAberto+=e.valor}});
   let caixa=F.caixa||0;
   const ci=F.caixaM?F.caixaM+'-01':'';
   F.entries.forEach(e=>{const ed=entryEffDate(ctx,e);if(e.pago&&(!ci||ed>=ci))caixa+=cg(e.cat).t==='R'?e.valor:-e.valor});
-  return {pe,rec,resgRec,des,res:rec-des,byCat,byProd,k,fixo,vari,opFixo,opVar,nVendas,caixa,recAberto,desAberto,recSemInv:rec-resgRec,desSemInv:des-(k.res||0)};
+  return {pe,rec,resgRec,des,res:rec-des,byCat,byProd,k,fixo,vari,fixoSemInv,variSemInv,opFixo,opVar,nVendas,caixa,recAberto,desAberto,recSemInv:rec-resgRec,desSemInv:des-(k.res||0)};
 }
 function toast(m){const h=$('#toast-host');h.innerHTML=`<div class="toast" role="status">${esc(m)}</div>`;clearTimeout(toast.t);toast.t=setTimeout(()=>{h.innerHTML=''},2600)}
 
@@ -1241,8 +1241,8 @@ function viewResumoPF(ctx,sm){
   // despesas por grupo
   const ge=groupsOf(ctx).filter(g=>g.t==='D'&&g.kind!=='res').map(g=>[g.n,allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)]).filter(x=>x[1]>0);
   if(sm.desSemInv>0&&ge.length)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 10px">Despesas do período por grupo, sem contar investimentos.</p>${donutHTML(ge,sm.desSemInv)}</div>`;
-  const td=sm.fixo+sm.vari;
-  if(td>0)h+=`<div class="card"><h2 class="h-card">Despesas fixas x variáveis</h2><p class="small muted" style="margin:0 0 10px">Quanto do gasto se repete todo mês e quanto pode ser ajustado.</p>${donutHTML([['Fixas',sm.fixo],['Variáveis',sm.vari]],td)}</div>`;
+  const td=sm.fixoSemInv+sm.variSemInv;
+  if(td>0)h+=`<div class="card"><h2 class="h-card">Despesas fixas x variáveis</h2><p class="small muted" style="margin:0 0 10px">Quanto do gasto se repete todo mês e quanto pode ser ajustado, sem contar investimentos.</p>${donutHTML([['Fixas',sm.fixoSemInv],['Variáveis',sm.variSemInv]],td)}</div>`;
   return h;
 }
 
