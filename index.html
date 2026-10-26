@@ -1441,10 +1441,18 @@ function viewLanc(ctx,sm){
   h+=`</div>`;
   return h;
 }
+function periodSelectHTML(){
+  const y0=new Date().getFullYear()-1,yEnd=y0+3,opts=[];
+  for(let y=y0;y<=yEnd;y++){
+    opts.push(`<option value="${y}-all" ${ui.period==='all'&&ui.year===y?'selected':''}>Todos os meses de ${y}</option>`);
+    opts.push(...MES.map((m,i)=>`<option value="${y}-${i}" ${ui.period===String(i)&&ui.year===y?'selected':''}>${m} ${y}</option>`));
+  }
+  return `<label class="f" for="per" style="margin-top:0">Período</label><select class="in" id="per" data-ch="period">${opts.join('')}</select>`;
+}
 function viewControle(){
   const ctx=ui.ctx,sm=finSummary(ctx);
   let h=`<div class="${modCls()}"><h1 class="h-page">Controle</h1>${ctxSeg(ctx)}${modBanner(ctx)}`;
-  h+=`<label class="f" for="per" style="margin-top:0">Período</label><select class="in" id="per" data-ch="period"><option value="all" ${ui.period==='all'?'selected':''}>Todos os meses</option>${MES.map((m,i)=>`<option value="${i}" ${ui.period===String(i)?'selected':''}>${m} ${ui.year}</option>`).join('')}</select>`;
+  h+=periodSelectHTML();
   h+=`<div class="seg" role="group" aria-label="Seção"><button data-act="fintab" data-v="resumo" aria-pressed="${ui.finTab==='resumo'}">Resumo</button><button data-act="fintab" data-v="lanc" aria-pressed="${ui.finTab==='lanc'}">Lançamentos</button></div>`;
   h+=ui.finTab==='lanc'?viewLanc(ctx,sm):viewResumo(ctx,sm)+investLink()+plannerLink();
   h+=`<button class="fab" data-act="sheet" data-v="entry">${svg('plus')} Novo lançamento</button>`;
@@ -1453,7 +1461,7 @@ function viewControle(){
 }
 function viewInvestTab(){
   let h=`<h1 class="h-page">Investimentos</h1>`;
-  h+=`<label class="f" for="per" style="margin-top:0">Período</label><select class="in" id="per" data-ch="period"><option value="all" ${ui.period==='all'?'selected':''}>Todos os meses</option>${MES.map((m,i)=>`<option value="${i}" ${ui.period===String(i)?'selected':''}>${m} ${ui.year}</option>`).join('')}</select>`;
+  h+=periodSelectHTML();
   h+=viewInv();
   h+=`<button class="fab" data-act="sheet" data-v="newinv">${svg('plus')} Novo investimento</button>`;
   return h;
@@ -2713,7 +2721,7 @@ document.addEventListener('change',function(ev){
   const t=ev.target;
   if(t.id==='imp_file'){handleImportFile(t.files[0]);return}
   if(t.hasAttribute('data-irpv')){invPreview();return}
-  if(t.dataset.ch==='period'){ui.period=t.value;render()}
+  if(t.dataset.ch==='period'){const i=t.value.lastIndexOf('-'),y=+t.value.slice(0,i),p=t.value.slice(i+1);ui.year=y;ui.period=p==='all'?'all':p;render()}
   else if(t.dataset.ch==='lancconta'){ui.lancConta=t.value;render()}
   else if(t.id==='lc_group'){ui.groupCard=t.checked;render()}
   else if(t.dataset.ch==='erec'){const w=$('#e_pawrap'),n=$('#e_recnote');if(w)w.hidden=t.checked;if(n)n.hidden=!t.checked}
