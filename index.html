@@ -2288,7 +2288,7 @@ function sheetHTML(){
     <div id="e_fvwrap"><label class="f" for="e_fv">Despesa fixa ou variável?</label><select class="in" id="e_fv"><option ${(!ed||ed.fv!=='Fixo')?'selected':''}>Variável</option><option ${ed&&ed.fv==='Fixo'?'selected':''}>Fixo</option></select></div>
     ${ed?'':`<label class="row small" style="margin:12px 0 0;gap:10px"><input type="checkbox" id="e_rec" data-ch="erec" style="width:20px;height:20px"> Despesa recorrente (repete todo mês, sem data pra acabar — ex.: aluguel, escola)</label>
     <div id="e_pawrap"><div class="grid2"><div><label class="f" for="e_pa">Parcela atual</label><input class="in" id="e_pa" inputmode="numeric" placeholder="1"></div><div><label class="f" for="e_pt">Total de parcelas</label><input class="in" id="e_pt" inputmode="numeric" placeholder="1"></div></div>
-    <label class="row small" style="margin:12px 0 0;gap:10px"><input type="checkbox" id="e_gen" style="width:20px;height:20px"> Lançar automaticamente as parcelas seguintes, mês a mês</label></div>
+    <p class="small muted" style="margin:8px 0 0">Se o total de parcelas for maior que 1, o app já lança sozinho as parcelas seguintes nos próximos meses.</p></div>
     <p id="e_recnote" class="small muted" style="margin:8px 0 0" hidden>Lança este e os próximos 23 meses de uma vez (2 anos), com este valor e esta categoria. Se o valor mudar depois (reajuste de contrato, por exemplo), você edita um lançamento e escolhe se é só daquele mês em diante.</p>`}
     ${ed&&ed.recId?`<label class="f" for="e_scope">Esta é uma despesa recorrente. Aplicar alteração a:</label><select class="in" id="e_scope"><option value="one">Somente este lançamento</option><option value="forward">Este e os próximos lançamentos desta recorrência</option></select>`:''}
     <div id="e_err" class="neg small" style="min-height:20px;margin-top:8px"></div>
@@ -2653,7 +2653,7 @@ function saveEntry(){
   let pa=1,pt=1;
   if(!editing){pa=parseInt($('#e_pa').value,10)||1;pt=parseInt($('#e_pt').value,10)||1;if(pt<1)pt=1;if(pa<1)pa=1;if(pa>pt)pt=pa}
   else{const ex=F.entries.find(e=>e.id===ui.editEntry);if(ex){pa=ex.pa||1;pt=ex.pt||1}}
-  const gen=!editing&&$('#e_gen').checked&&pt>pa;
+  const gen=!editing&&pt>pa;
   const conta=$('#e_conta')?$('#e_conta').value:'';
   const contaAcc=conta?accFind(ui.ctx,conta):null;
   const fatVenc=(contaAcc&&contaAcc.tipo==='cartao'&&contaAcc.vencDia&&$('#e_fat')&&!$('#e_fatwrap').hidden&&$('#e_fat').value)?$('#e_fat').value:undefined;
