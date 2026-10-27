@@ -1718,27 +1718,34 @@ function lineSvg(vals,lastLabel){
   return s;
 }
 
+const cStr=v=>typeof v==='string'?v:'';
+function cmpDI(a,b){return cStr(a&&a.date).localeCompare(cStr(b&&b.date))||cStr(a&&a.id).localeCompare(cStr(b&&b.id))}
 function invPurchases(ctx,inv){
   const list=[];
   if(inv.qtd>0&&inv.preco>0)list.push({date:inv.dataIni||'',qtd:inv.qtd,preco:inv.preco,origem:'Cadastro inicial',id:''});
-  (S.fin[ctx].entries||[]).forEach(e=>{if(e.inv===inv.id&&e.invQtd>0&&e.invPreco>0&&e.pago)list.push({date:e.date,qtd:e.invQtd,preco:e.invPreco,origem:'Compra',id:e.id});});
-  list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.id||'').localeCompare(b.id||''));
+  (S.fin[ctx].entries||[]).forEach(e=>{if(e&&e.inv===inv.id&&e.invQtd>0&&e.invPreco>0&&e.pago)list.push({date:e.date,qtd:e.invQtd,preco:e.invPreco,origem:'Compra',id:e.id});});
+  list.sort(cmpDI);
   const totalQtd=list.reduce((a,x)=>a+x.qtd,0),totalCusto=list.reduce((a,x)=>a+x.qtd*x.preco,0);
-  const sells=(S.fin[ctx].invRecs||[]).filter(r=>r.inv===inv.id&&r.tipo==='resg'&&r.qtdVend>0);
+  const sells=(S.fin[ctx].invRecs||[]).filter(r=>r&&r.inv===inv.id&&r.tipo==='resg'&&r.qtdVend>0);
   const qtdVendida=sells.reduce((a,r)=>a+r.qtdVend,0);
   const qtdPos=Math.max(0,totalQtd-qtdVendida);
   // Média ponderada "viva": reconstitui a posição em ordem cronológica (compras e
   // vendas juntas) e zera o custo acumulado sempre que a quantidade em carteira
   // chega a zero, para uma compra nova não herdar o preço médio de um lote já
   // totalmente liquidado.
-  const evs=[...list.map(x=>({date:x.date,id:x.id||'',t:'buy',qtd:x.qtd,preco:x.preco})),...sells.map(r=>({date:r.date||'',id:r.id||'',t:'sell',qtd:r.qtdVend}))];
-  evs.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.id.localeCompare(b.id));
-  let runQtd=0,runCusto=0;
-  evs.forEach(e=>{
-    if(e.t==='buy'){runQtd+=e.qtd;runCusto+=e.qtd*e.preco}
-    else{const avg=runQtd>0?runCusto/runQtd:0;runQtd-=e.qtd;runCusto-=e.qtd*avg;if(runQtd<=0.0001){runQtd=0;runCusto=0}}
-  });
-  const avgPreco=runQtd>0.0001?runCusto/runQtd:null;
+  let avgPreco=null;
+  try{
+    const evs=[...list.map(x=>({date:x.date,id:x.id||'',t:'buy',qtd:x.qtd,preco:x.preco})),...sells.map(r=>({date:r.date||'',id:r.id||'',t:'sell',qtd:r.qtdVend}))];
+    evs.sort(cmpDI);
+    let runQtd=0,runCusto=0;
+    evs.forEach(e=>{
+      if(e.t==='buy'){runQtd+=e.qtd;runCusto+=e.qtd*e.preco}
+      else{const avg=runQtd>0?runCusto/runQtd:0;runQtd-=e.qtd;runCusto-=e.qtd*avg;if(runQtd<=0.0001){runQtd=0;runCusto=0}}
+    });
+    avgPreco=runQtd>0.0001?runCusto/runQtd:null;
+  }catch(e){
+    avgPreco=totalQtd>0?totalCusto/totalQtd:null;
+  }
   return {list,totalQtd,avgPreco,qtdVendida,qtdPos};
 }
 
