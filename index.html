@@ -2395,17 +2395,22 @@ function sheetHTML(){
 const VIEWS={home:viewHome,planner:viewPlannerTab,invest:viewInvestTab,controle:viewControle,tools:viewTools};
 function render(top){
   let body;
-  if(ui.page==='perfil')body=viewPerfil();
-  else if(ui.page==='orc')body=viewOrc();
-  else if(ui.page==='cats')body=viewCats();
-  else if(ui.page==='prods')body=viewProds();
-  else if(ui.page==='invs')body=viewInvs();
-  else if(ui.page==='contas')body=viewContas();
-  else if(ui.page==='import')body=viewImport();
-  else if(ui.page==='goal')body=viewGoalForm();
-  else if(ui.page==='cardinv')body=viewCardInv();
-  else if(ui.reader!=null)body=viewReader();
-  else body=header()+'<main>'+VIEWS[ui.tab]()+'</main>'+tabbar();
+  try{
+    if(ui.page==='perfil')body=viewPerfil();
+    else if(ui.page==='orc')body=viewOrc();
+    else if(ui.page==='cats')body=viewCats();
+    else if(ui.page==='prods')body=viewProds();
+    else if(ui.page==='invs')body=viewInvs();
+    else if(ui.page==='contas')body=viewContas();
+    else if(ui.page==='import')body=viewImport();
+    else if(ui.page==='goal')body=viewGoalForm();
+    else if(ui.page==='cardinv')body=viewCardInv();
+    else if(ui.reader!=null)body=viewReader();
+    else body=header()+'<main>'+VIEWS[ui.tab]()+'</main>'+tabbar();
+  }catch(err){
+    console.error('Erro ao renderizar',err);
+    body=`<main style="padding:20px 16px"><h1 class="h-page">Algo deu errado</h1><p class="sub">Essa tela não conseguiu carregar. Toque abaixo para voltar ao início, e se puder, me mande o texto do quadro cinza — isso me ajuda a corrigir rápido.</p><pre style="white-space:pre-wrap;word-break:break-word;background:var(--surface2,#eee);padding:12px;border-radius:10px;font-size:11px;margin-top:12px">${esc(String((err&&err.stack)||err))}</pre><button class="btn block" style="margin-top:16px" data-act="tab" data-v="home">Voltar ao início</button></main>${tabbar()}`;
+  }
   $('#app').innerHTML=body+sheetHTML();
   if(top)window.scrollTo(0,0);
   if(ui.page==='orc')budgetTotals();
