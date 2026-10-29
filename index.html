@@ -904,11 +904,11 @@ function nextGuide(){
   if(d){const sc=d.secs;let w=0;sc.forEach((v,i)=>{if(v<sc[w])w=i});const g=GUIDES.find(x=>x.sec===w);if(g&&!S.read[g.id])return g}
   return GUIDES.find(g=>g.id>0&&g.b.some(x=>x[0]==='m')&&!S.read[g.id])||null;
 }
-function inPeriod(e){if(ui.period==='all')return true;const d=new Date(e.date+'T12:00:00');return d.getMonth()===+ui.period&&d.getFullYear()===ui.year}
+function inPeriod(ctx,e){if(ui.period==='all')return true;const d=new Date(entryEffDate(ctx,e)+'T12:00:00');return d.getMonth()===+ui.period&&d.getFullYear()===ui.year}
 
 function caixaSub(ctx){const c=S.fin[ctx].caixaM;if(!c)return 'caixa inicial + entradas − saídas até hoje';const p=c.split('-');return `caixa inicial de ${MES3[+p[1]-1]}/${p[0]} + entradas − saídas até hoje`}
 function finSummary(ctx){
-  const F=S.fin[ctx];const pe=F.entries.filter(inPeriod);
+  const F=S.fin[ctx];const pe=F.entries.filter(e=>inPeriod(ctx,e));
   const cm={};allCats(ctx).forEach(c=>{cm[c.id]=c});const cg=id=>cm[id]||catOf(ctx,id);
   let rec=0,des=0,fixo=0,vari=0,fixoSemInv=0,variSemInv=0,opFixo=0,opVar=0,nVendas=0,resgRec=0,recAberto=0,desAberto=0;const byCat={},byProd={},k={op:0,imp:0,pl:0,res:0,div:0,out:0};
   pe.forEach(e=>{const c=cg(e.cat);byCat[e.cat]=(byCat[e.cat]||0)+e.valor;
@@ -1159,7 +1159,7 @@ function viewReader(){
 function ttsBlocks(g){let n=0;return g.b.map(b=>{if(b[0]==='s'){n++;return `Passo ${n}. ${b[1]}`}if(b[0]==='m')return `Experimente esta semana. ${b[1]}`;if(b[0]==='d')return `${b[1]}: ${b[2]}`;return b[1]})}
 
 const MES3=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-function monthly(ctx){const r=Array(12).fill(0),d=Array(12).fill(0);S.fin[ctx].entries.forEach(e=>{const dt=new Date(e.date+'T12:00:00');if(dt.getFullYear()!==ui.year)return;const m=dt.getMonth();if(catOf(ctx,e.cat).t==='R')r[m]+=e.valor;else d[m]+=e.valor});return {r,d}}
+function monthly(ctx){const r=Array(12).fill(0),d=Array(12).fill(0);S.fin[ctx].entries.forEach(e=>{const dt=new Date(entryEffDate(ctx,e)+'T12:00:00');if(dt.getFullYear()!==ui.year)return;const m=dt.getMonth();if(catOf(ctx,e.cat).t==='R')r[m]+=e.valor;else d[m]+=e.valor});return {r,d}}
 const pct1=n=>n.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
 function chartMonths(ctx){
   const m=monthly(ctx);const max=Math.max(1,...m.r,...m.d);
