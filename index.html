@@ -1197,6 +1197,17 @@ function donutHTML(items,total){
   let acc=0;const stops=items.map((it,i)=>{const a=acc,b=acc+it[1]/total*100;acc=b;return `${PAL[i%PAL.length]} ${a.toFixed(2)}% ${b.toFixed(2)}%`}).join(',');
   return `<div class="row" style="gap:16px"><div class="donut" style="background:conic-gradient(${stops})" role="img" aria-label="Distribuição"></div><div class="grow small">${items.map((it,i)=>`<div style="margin:5px 0"><span class="dot" style="background:${PAL[i%PAL.length]}"></span>${esc(it[0])}<br><b>${brl(it[1])}</b> · ${pct1(it[1]/total*100)}</div>`).join('')}</div></div>`;
 }
+function gastoGrupoDonutHTML(ctx,sm){
+  const groups=groupsOf(ctx).filter(g=>g.t==='D'&&g.kind!=='res').map(g=>({id:g.id,n:g.n,v:allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)})).filter(x=>x.v>0);
+  if(!groups.length||!(sm.desSemInv>0))return '';
+  let acc=0;const stops=groups.map((g,i)=>{const a=acc,b=acc+g.v/sm.desSemInv*100;acc=b;return `${PAL[i%PAL.length]} ${a.toFixed(2)}% ${b.toFixed(2)}%`}).join(',');
+  let h=`<div class="donut" style="background:conic-gradient(${stops});margin:0 auto" role="img" aria-label="Distribuição"></div><p class="small muted" style="text-align:center;margin:8px 0 14px">Toque num grupo pra ver os lançamentos.</p>`;
+  groups.forEach((g,i)=>{
+    const ents=sm.pe.filter(e=>{const c=catOf(ctx,e.cat);return c.t==='D'&&c.gid===g.id}).slice().sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));
+    h+=`<details class="term" style="margin:4px 0"><summary><span class="grow"><span class="dot" style="background:${PAL[i%PAL.length]}"></span>${esc(g.n)}<br><b>${brl(g.v)}</b> · ${pct1(g.v/sm.desSemInv*100)}</span></summary>${ents.length?ents.map(e=>entryRow(ctx,e)).join(''):'<p class="small muted" style="margin:8px 0">Nenhum lançamento.</p>'}</details>`;
+  });
+  return h;
+}
 function kpi(label,value,sub,color,cls){return `<div class="kpi ${cls||''}" style="--kc:${color}"><small>${label}</small><b>${value}</b>${sub?`<span class="ks">${sub}</span>`:''}</div>`}
 function barCls(isR,real,orc){if(isR)return 'sage';if(!(orc>0))return 'neg';return real>orc?'neg':'sage'}
 function viewResumoPF(ctx,sm){
@@ -1244,8 +1255,7 @@ function viewResumoPF(ctx,sm){
   });
   h+=`<div style="margin-top:12px"><button class="btn ghost small" data-act="orc">Ajustar orçamento mensal</button></div></div>`;
   // despesas por grupo
-  const ge=groupsOf(ctx).filter(g=>g.t==='D'&&g.kind!=='res').map(g=>[g.n,allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)]).filter(x=>x[1]>0);
-  if(sm.desSemInv>0&&ge.length)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 4px">Despesas do período por grupo, sem contar investimentos.</p><p style="margin:0 0 10px;font:600 18px 'Poppins',sans-serif">${brl(sm.desSemInv)}</p>${donutHTML(ge,sm.desSemInv)}</div>`;
+  {const ggh=gastoGrupoDonutHTML(ctx,sm);if(ggh)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 4px">Despesas do período por grupo, sem contar investimentos.</p><p style="margin:0 0 10px;font:600 18px 'Poppins',sans-serif">${brl(sm.desSemInv)}</p>${ggh}</div>`;}
   const td=sm.fixoSemInv+sm.variSemInv;
   if(td>0)h+=`<div class="card"><h2 class="h-card">Despesas fixas x variáveis</h2><p class="small muted" style="margin:0 0 10px">Quanto do gasto se repete todo mês e quanto pode ser ajustado, sem contar investimentos.</p>${donutHTML([['Fixas',sm.fixoSemInv],['Variáveis',sm.variSemInv]],td)}</div>`;
   return h;
@@ -1345,8 +1355,7 @@ function viewResumoPJ(ctx,sm){
   const ac=chartAcum(ctx);
   if(ac)h+=`<div class="card"><h2 class="h-card">Resultado de caixa acumulado no ano</h2><p class="small muted" style="margin:0 0 6px">Receitas menos todas as saídas, mês a mês.</p>${ac}</div>`;
   h+=grupoOrcadoHTML(ctx,sm);
-  const ge=groupsOf(ctx).filter(g=>g.t==='D'&&g.kind!=='res').map(g=>[g.n,allCats(ctx).filter(c=>c.gid===g.id).reduce((a,c)=>a+(sm.byCat[c.id]||0),0)]).filter(x=>x[1]>0);
-  if(sm.desSemInv>0&&ge.length)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 4px">Saídas do período por grupo, sem contar investimentos.</p><p style="margin:0 0 10px;font:600 18px 'Poppins',sans-serif">${brl(sm.desSemInv)}</p>${donutHTML(ge,sm.desSemInv)}</div>`;
+  {const ggh=gastoGrupoDonutHTML(ctx,sm);if(ggh)h+=`<div class="card"><h2 class="h-card">Para onde vai o dinheiro</h2><p class="small muted" style="margin:0 0 4px">Saídas do período por grupo, sem contar investimentos.</p><p style="margin:0 0 10px;font:600 18px 'Poppins',sans-serif">${brl(sm.desSemInv)}</p>${ggh}</div>`;}
   const td=sm.opFixo+sm.opVar;
   if(td>0)h+=`<div class="card"><h2 class="h-card">Custos operacionais: fixos x variáveis</h2><p class="small muted" style="margin:0 0 10px">Os fixos entram no ponto de equilíbrio; os variáveis acompanham as vendas.</p>${donutHTML([['Fixos',sm.opFixo],['Variáveis',sm.opVar]],td)}</div>`;
   return h;
