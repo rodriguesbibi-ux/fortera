@@ -1624,7 +1624,21 @@ function invRun(ctx,inv,extra){
   if(extra)evs.push(Object.assign({o:extra.t==='saldo'?4:3},extra));
   evs.sort((a,b)=>a.d<b.d?-1:(a.d>b.d?1:a.o-b.o));
   let P=0;
-  evs.forEach(e=>{if(e.t==='open'||e.t==='apo')P+=e.v;else if(e.t==='resg')P-=e.v;else if(e.t==='rend')P+=e.v;else if(e.t==='div'){}else{e.pre=P;e.y=e.v-P;P=e.v}});
+  evs.forEach(e=>{
+    if(e.t==='open'||e.t==='apo')P+=e.v;
+    else if(e.t==='resg'){
+      // Mesmo critério de invCalc(): o que sai do saldo é o custo do que foi vendido,
+      // não o valor recebido na venda — o ganho/perda de capital é tratado à parte
+      // (ver "Ganho de capital (vendas)"), nunca dentro do valor final da carteira.
+      // Isso mantém esse acumulador consistente com o de invCalc(); se divergissem,
+      // um saldo informado depois de um resgate ficaria com o rendimento errado.
+      const custoVend=e.ganho!=null?(e.custoVend!=null?e.custoVend:(e.v-(e.taxas||0)-e.ganho)):e.v;
+      P-=custoVend;
+    }
+    else if(e.t==='rend')P+=e.v;
+    else if(e.t==='div'){}
+    else{e.pre=P;e.y=e.v-P;P=e.v}
+  });
   return {evs,pos:P};
 }
 function invCalc(ctx,inv,start,end){
