@@ -1725,7 +1725,7 @@ function invPreview(){
 function invAgg(items,start,end){
   const a={ini:0,apo:0,rend:0,resg:0,fin:0,divid:0,ganhoCap:0,custoGanhoCap:0,rendRF:0,rendNRel:0};
   items.forEach(x=>{const c=invCalc(x.ctx,x.inv,start,end);x.c=c;for(const k in a)a[k]+=c[k]});
-  a.base=a.ini+a.apo;a.rendTot=a.rendRF+a.divid+a.ganhoCap;a.pct=a.base>0?(a.rendRF+a.divid+a.rendNRel)/a.base*100:null;return a;
+  a.base=a.ini+a.apo;a.rendTot=a.rendRF+a.divid+a.ganhoCap;a.pct=a.base>0?a.rendTot/a.base*100:null;return a;
 }
 function lineSvg(vals,lastLabel){
   const last=vals.length-1;if(last<0)return '';
@@ -1798,7 +1798,7 @@ function viewInv(){
    ${items.some(x=>RF_TIPOS.includes(x.inv.tipo))?kpi('Rendimento renda fixa',`<span class="${ag.rendRF<0?'neg':'pos'}">${brl(ag.rendRF)}</span>`,'juros de poupança, CDB, tesouro etc.','var(--pri)'):''}
    ${items.some(x=>!RF_TIPOS.includes(x.inv.tipo))?kpi('Dividendos',`<span class="${ag.divid<0?'neg':'pos'}">${brl(ag.divid)}</span>`,'renda de FIIs, ações e demais variáveis','var(--pri)'):''}
    ${items.some(x=>!RF_TIPOS.includes(x.inv.tipo))?kpi('Valorização não realizada',`<span class="${ag.rendNRel<0?'neg':'pos'}">${brl(ag.rendNRel)}</span>`,'variação de preço da renda variável','var(--pri)'):''}
-   ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento (RF + dividendos + não realizado) ÷ (saldo inicial + aportes)','var(--terra-m)')}
+   ${kpi('Rentabilidade no período',ag.pct===null?'–':`<span class="${ag.pct<0?'neg':'pos'}">${pct1(ag.pct)}</span>`,'rendimento (RF + dividendos + ganho de capital) ÷ (saldo inicial + aportes), sem contar valorização não realizada','var(--terra-m)')}
    ${ag.ganhoCap?kpi('Ganho de capital',`<span class="${ag.ganhoCap<0?'neg':'pos'}">${brl(ag.ganhoCap)}</span>`,ag.custoGanhoCap>0?`<span class="${ag.ganhoCap<0?'neg':'pos'}">${pct1(ag.ganhoCap/ag.custoGanhoCap*100)}</span> sobre o custo vendido`:'em vendas no período','var(--sage-d)'):''}
    ${kpi('Rendimento total',`<span class="${ag.rendTot<0?'neg':'pos'}">${brl(ag.rendTot)}</span>`,'renda fixa + dividendos + ganho de capital','var(--sage-d)')}</div>`;
   // composição por tipo
