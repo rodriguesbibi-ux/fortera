@@ -1368,7 +1368,7 @@ function entryRow(ctx,e){
   const statusPill=`<span class="pill ${e.pago?'ok':'warn'}" style="margin-left:4px">${e.pago?(isR?'Recebido':'Pago'):'Em aberto'}</span>`;
   const statusAct=e.pago?`<button class="small muted" style="font-weight:600;text-decoration:underline" data-act="unmarkpaid" data-v="${e.id}">Marcar como em aberto</button>`:`<button class="small" style="font-weight:600;text-decoration:underline;color:var(--sage-d)" data-act="markpaid" data-v="${e.id}">Marcar como ${isR?'recebido':'pago'}</button>`;
   const acc=e.conta?accFind(ctx,e.conta):null,ed=entryEffDate(ctx,e);
-  const dueHint=(acc&&acc.tipo==='cartao'&&ed!==e.date)?` · vence ${ed.slice(8)}/${ed.slice(5,7)}${e.fatVenc?' (ajustado)':''}`:'';
+  const dueHint=(acc&&acc.tipo==='cartao'&&ed!==e.date)?` · vence ${ed.slice(8)}/${ed.slice(5,7)}${(e.fatVenc&&!(e.pt>1&&e.pa>1))?' (ajustado)':''}`:'';
   return `<div class="entry"><div class="erow"><div class="date">${e.date.slice(8)}/${e.date.slice(5,7)}</div><div class="grow"><div class="etitle">${esc(e.desc||c.n)}${e.recId?' <span class=\'pill\' style=\'margin-left:4px\'>Recorrente</span>':''}${statusPill}</div><div class="esub">${esc(c.n)}${e.prod?' · '+esc(prodName(e.prod)):''}${e.inv?' · '+esc(invName(ctx,e.inv)):''}${e.conta?' · '+esc(accName(ctx,e.conta)):''}${!isR?' · '+esc(e.fv||'Variável'):''}${e.pt>1?` · parcela ${e.pa}/${e.pt}`:''}${dueHint}</div></div><div class="evalue ${isR?'pos':''}">${isR?'+':'−'} ${brl(e.valor)}</div></div><div class="eacts">${(!e.fromRec&&!e.xferId)?statusAct:''}${!e.xferId?`<button class="muted" data-act="editentry" data-v="${e.id}">Editar</button>`:''}<button class="${ui.del===e.id?'neg':'muted'}" data-act="del" data-v="${e.id}">${ui.del===e.id?'Confirmar exclusão':'Excluir'}</button></div></div>`;
 }
 
@@ -2750,7 +2750,16 @@ function saveEntry(){
   }
   const base=Date.now();
   F.entries.push({id:base,date,cat,desc,valor:val,fv,pa,pt,prod:prod||undefined,qtd,inv:inv||undefined,invQtd:invQtd||undefined,invPreco:invPreco||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,fatVenc,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date,fatVenc})<=todayISO()});
-  if(gen){for(let k=1;k<=pt-pa;k++){const d2=addMonths(date,k);F.entries.push({id:base+k,date:d2,cat,desc,valor:val,fv,pa:pa+k,pt,prod:prod||undefined,qtd,inv:inv||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date:d2})<=todayISO()})}}
+  if(gen){
+    // Cartão: a data do lançamento é a da compra e se mantém em todas as parcelas;
+    // quem muda de mês é o vencimento da fatura (fatVenc). Fora do cartão, a data avança mês a mês.
+    const isCard=!!(contaAcc&&contaAcc.tipo==='cartao'&&contaAcc.vencDia);
+    const due0=isCard?entryEffDate(ui.ctx,{conta,date,fatVenc}):null;
+    for(let k=1;k<=pt-pa;k++){
+      const d2=isCard?date:addMonths(date,k),fv2=isCard?addMonths(due0,k):undefined;
+      F.entries.push({id:base+k,date:d2,cat,desc,valor:val,fv,pa:pa+k,pt,prod:prod||undefined,qtd,inv:inv||undefined,goals:goals.length?goals:undefined,conta:conta||undefined,fatVenc:fv2,pago:entryEffDate(ui.ctx,{conta:conta||undefined,date:d2,fatVenc:fv2})<=todayISO()});
+    }
+  }
   save();ui.sheet=null;ui.prefillConta=null;render();toast(gen?`Lançamento e ${pt-pa} parcela(s) salvos`:'Lançamento salvo');
 }
 document.addEventListener('input',function(ev){
