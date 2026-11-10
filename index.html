@@ -1378,15 +1378,17 @@ function faturaRow(ctx,g){
   return `<div class="entry"><div class="erow"><div class="date">${g.date.slice(8)}/${g.date.slice(5,7)}</div><div class="grow"><div class="etitle">💳 Fatura ${esc(card?card.n:'Cartão')}${statusPill}</div><div class="esub">${g.count} lançamento(s) · vencimento</div></div><div class="evalue ${isNeg?'pos':''}">${isNeg?'+':'−'} ${brl(Math.abs(g.total))}</div></div><div class="eacts"><button class="muted" data-act="opencardinvdue" data-v="${g.date}" data-c="${ctx}" data-id="${g.conta}">Ver lançamentos da fatura</button></div></div>`;
 }
 function mkBalanceAsOf(ctx,selAcc){
-  const F=S.fin[ctx];
+  // Dias até hoje: só o que já foi pago/recebido. Dias futuros: previsão, somando também
+  // o que está a pagar/receber (pago=false) com data até aquele dia.
+  const F=S.fin[ctx],hoje=todayISO();
   if(selAcc){
     const base=selAcc.saldoIni||0,dataIni=selAcc.dataIni,isCard=selAcc.tipo==='cartao';
-    const ents=F.entries.filter(e=>e.conta===selAcc.id&&(isCard||e.pago)&&(!dataIni||e.date>=dataIni));
-    return d=>base+ents.filter(e=>e.date<=d).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0);
+    const ents=F.entries.filter(e=>e.conta===selAcc.id&&(!dataIni||e.date>=dataIni));
+    return d=>base+ents.filter(e=>e.date<=d&&(isCard||e.pago||d>hoje)).reduce((a,e)=>a+(catOf(ctx,e.cat).t==='R'?e.valor:-e.valor),0);
   }
   const ci=F.caixaM?F.caixaM+'-01':'',base=F.caixa||0;
-  const ents=F.entries.filter(e=>e.pago&&(!ci||entryEffDate(ctx,e)>=ci)).map(e=>({e,ed:entryEffDate(ctx,e)}));
-  return d=>base+ents.filter(x=>x.ed<=d).reduce((a,x)=>a+(catOf(ctx,x.e.cat).t==='R'?x.e.valor:-x.e.valor),0);
+  const ents=F.entries.filter(e=>!ci||entryEffDate(ctx,e)>=ci).map(e=>({e,ed:entryEffDate(ctx,e)}));
+  return d=>base+ents.filter(x=>x.ed<=d&&(x.e.pago||d>hoje)).reduce((a,x)=>a+(catOf(ctx,x.e.cat).t==='R'?x.e.valor:-x.e.valor),0);
 }
 function dayGroupsHTML(ctx,items,balFn){
   let h='',curDate=null;
@@ -1394,7 +1396,7 @@ function dayGroupsHTML(ctx,items,balFn){
     if(e.date!==curDate){
       curDate=e.date;
       const bal=balFn(curDate);
-      h+=`<div class="row between" style="margin:16px 0 4px;align-items:baseline;border-top:1px solid var(--line);padding-top:8px"><span class="small muted" style="font-weight:600">${curDate.slice(8)}/${curDate.slice(5,7)}/${curDate.slice(0,4)}</span><span class="small" style="font-weight:600">Saldo do dia: <b class="${bal<0?'neg':''}">${brl(bal)}</b></span></div>`;
+      h+=`<div class="row between" style="margin:16px 0 4px;align-items:baseline;border-top:1px solid var(--line);padding-top:8px"><span class="small muted" style="font-weight:600">${curDate.slice(8)}/${curDate.slice(5,7)}/${curDate.slice(0,4)}</span><span class="small" style="font-weight:600">${curDate>todayISO()?'Saldo previsto do dia':'Saldo do dia'}: <b class="${bal<0?'neg':''}">${brl(bal)}</b></span></div>`;
     }
     h+=e.isFatura?faturaRow(ctx,e):entryRow(ctx,e);
   });
